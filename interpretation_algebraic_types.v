@@ -1399,7 +1399,7 @@ Abort.
 
 
 
-(* Check is a MetaCoq term is a sort *)
+(* Check if a MetaCoq term is a sort *)
 Definition is_sort (t : term) := match t with
                                  | tSort _ => true
                                  |_ => false
