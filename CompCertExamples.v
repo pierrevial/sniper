@@ -1,23 +1,6 @@
-(**************************************************************************)
-(*                                                                        *)
-(*     Sniper                                                             *)
-(*     Copyright (C) 2021                                                 *)
-(*                                                                        *)
-(*     See file "AUTHORS" for the list of authors                         *)
-(*                                                                        *)
-(*   This file is distributed under the terms of the CeCILL-C licence     *)
-(*                                                                        *)
-(**************************************************************************)
+From Trakt.Extension.SMTCoq Require Import Tactics_sniper.
 
-
-(* If you have installed Sniper, change this line into `Require Import Sniper.Sniper`. *)
-Require Import Sniper.
-Require Import String.
 Require Import ZArith.
-Require Import Bool.
-Require Import List.
-Import ListNotations.
-
 
 
 
