@@ -17,7 +17,10 @@ Require Import ZArith.
 Require Import Bool.
 Require Import List.
 Import ListNotations.
-
+Add Rec LoadPath "/home/pierre/depots/trakt-v1/theories" as Trakt.
+Add Rec LoadPath "/home/pierre/depots/trakt-v1/extension" as Trakt.Extension.SMTCoq.
+Require Import Trakt.
+(* From Trakt.Extension.SMTCoq Require Import Tactics_sniper.*)
 
 
 
@@ -150,9 +153,9 @@ end.
 Lemma perm_orderb_trans:
   forall p1 p2 p3, perm_orderb p1 p2 -> perm_orderb p2 p3 -> perm_orderb p1 p3.
 Proof. 
-snipe. (* does not properly work, some goals should be handled *)
-admit. admit. admit. admit. 
-Admitted. 
+snipe. 
+admit. 
+Admitted.
 
 
 Inductive perm_kind: Type :=
@@ -226,8 +229,8 @@ Definition size_chunk (chunk: memory_chunk) : Z :=
 Lemma size_chunk_pos:
   forall chunk, (size_chunk chunk > 0)%Z.
 Proof.
-  intros. (* snipe. *)  (* takes a lot of time and fails! but should not *)
-(* destruct chunk; simpl; lia. *) 
+  destruct chunk ; snipe.  (* problem: destruct should be useless *)
+all:(admit).
 Admitted.
 
 Definition size_chunk_nat (chunk: memory_chunk) : nat :=
@@ -236,8 +239,14 @@ Definition size_chunk_nat (chunk: memory_chunk) : nat :=
 Lemma size_chunk_conv:
   forall chunk, size_chunk chunk = Z.of_nat (size_chunk_nat chunk).
 Proof.
-  intros. (* snipe. *)  (* takes a lot of time and fails! but should not *)
-destruct chunk; reflexivity. 
+  destruct chunk. Fail snipe.
+  (* Depending on my remote, the command fails either with "no matching clause for match" or with the message: "
+The command has indeed failed with message:
+The elpi tactic trakt failed without giving a specific error message. Please
+report this inconvenience to the authors of the program."
+I cannot obtain this error in my compcert branch of the remote sniper...
+*)
+  all:(simpl; snipe).
 Qed.
 
 
