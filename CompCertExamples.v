@@ -244,7 +244,7 @@ Qed.
 Lemma size_chunk_nat_pos:
   forall chunk, exists n, size_chunk_nat chunk = S n.
 Proof.
-  intros.
+  intros. 
   (* snipe. *)  (* takes a lot of time and fails! but should not *)
  (* generalize (size_chunk_pos chunk). rewrite size_chunk_conv.
   destruct (size_chunk_nat chunk).
