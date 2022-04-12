@@ -8,6 +8,68 @@ Elpi Accumulate File "find_instances.elpi".
 Elpi Accumulate File "subterms.elpi".
 Elpi Accumulate File "construct_cuts.elpi".
 
+(*  Elpi Accumulate lp:{{
+   decl x {{nat}}, coq.say "x is" x.
+}}. *)
+
+
+
+Elpi Query lp:{{
+   subterms {{fun (x : nat) => (x * x)%nat }} L,
+  L = [T1 | [T2 | [T3 ] ]],
+  coq.say "T1 = " T1, coq.say "T2 = " T2, coq.say "T3 =" T3,
+  coq.say "T4 = " T4, coq.say "T5 = " T5
+}}.
+
+Elpi Accumulate lp:{{
+
+ kind blut type.
+  type a blut. 
+  type b blut.
+
+pred mylist i : term, o : (list blut). 
+mylist (global G) [a].
+mylist (fun N Ty F) [b | R] :- !, 
+   mylist Ty R1, pi y\ decl x N Ty => mylist (F x) R2, coq.say "B= " B, 
+   std.append R1 R2 R.
+
+pred myotherlist i : term, o : (list blut). 
+myotherlist (global G) [a].
+myotherlist (fun N Ty F) [b | R] :- !, 
+   mylist Ty R1,  decl x N Ty, myotherlist (F x) R2, 
+   std.append R1 R2 R.
+}}.
+
+Elpi Query lp:{{
+  mylist {{ fun (x: nat) => true }} R.
+}}.
+
+Fail Elpi Query lp:{{
+  myotherlist {{ fun (x: nat) => true }} R.
+}}.
+
+
+
+Definition x:= 2.
+
+Fail Elpi Query lp:{{
+  coq.typecheck 2 nat ok.
+
+}}.
+
+Elpi Query lp:{{
+  coq.typecheck {{x}} {{nat}} ok, coq.say "ok = " ok.
+}}.
+
+
+
+
+
+Fail Elpi Query lp:{{
+  coq.typecheck {{ 0 }} {{(@list nat)}} ok, coq.say "ok = " ok.
+}}.
+
+
 Elpi Accumulate lp:{{
 
  pred instances_param_indu_strategy_list i: list (pair term term), i: list (pair term (list instance)), i: goal, o: list sealed-goal.

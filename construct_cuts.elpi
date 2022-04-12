@@ -1,6 +1,7 @@
 pred construct_cuts i: (list term), o: term.
 construct_cuts [X | XS] (app [(fun `new_hyp` X1 x\ G x), R]) :- 
     std.assert-ok! (coq.elaborate-ty-skeleton X _ X1) "cut formula illtyped",
+    % \Q que veut dire le bang après std.assert-ok ?
     pi x\ decl x N H1 =>
     construct_cuts XS (G x).
 construct_cuts [] T.
