@@ -30,7 +30,10 @@ end ;
  assert (H: x = x') by (unfold x ; reflexivity))
 end.
 
-Ltac get_definitions_aux p := fun k =>
+Ltac get_definitions_aux p := fun k => (* principe de l'appel de k ???
+ les H sont les définitions, et on les met dans la continuation k ???
+ *)
+(* \Rq ??? p semble stocker tout ce qui a déjà été unfoldé *)
  match goal with 
 | |- context C[?x] => 
 let x' := eval unfold x in x in is_not_in_tuple p x ; 
@@ -44,7 +47,7 @@ let H := fresh x "_def" in (
 | _ => idtac 
 end.
 
-Ltac get_definitions_theories := fun p0 k => 
+Ltac get_definitions_theories := fun p0 k =>  (* pourquoi pas directement la fonction ci-dessus ??? *
 get_definitions_aux p0 k.
 
 (* The basic tactic, not recursive *)

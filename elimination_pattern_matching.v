@@ -314,7 +314,7 @@ lazymatch constr:(p) with
 | unit => idtac
 end.
 
-Definition head_tuple (A B : Type) (x : A×B) := match x with
+Definition head_tuple (A B : Type) (x : A * B) := match x with
 |(y, z) => y
 end.
 
@@ -371,48 +371,85 @@ match p with
 end.
 
 Ltac eliminate_dependent_pattern_matching H :=
+  (* H hypo dont la forme est forall x1 ... forall xn E[match xi with P1 | P2 ... | Pk ] *)
   let n := fresh "n" in 
   let T := fresh "T" in 
-  epose (n := ?[n_evar] : nat) ;
-  epose (T := ?[T_evar]) ;
+  epose (n := ?[n_evar] : nat) ; (* n_evar censé récupérer le nombre de forall avant le pm dans H *)
+   (* \Q à quoi set    *)
+  epose (T := ?[T_evar]) ;  (* T_evar censé récupérer le type principal de H ??? *)
   let U := type of H in
   let H' := fresh in
-  assert (H' : False -> U);
+  assert (H' : False -> U);    (* copie du type de H, tout cela pour compter les forall prénexes*)  
   [ let HFalse := fresh in
-    intro HFalse;
+    intro HFalse;   
     let rec tac_rec m x :=
-        match goal with
-      | |- context C[match x with _ => _ end] => match constr:(m) with
-                                    | 0 => fail
-                                    | S ?p => instantiate (n_evar := p) ; 
+        match goal with   
+      | |- context C[match x with _ => _ end] => match constr:(m) with  (* s'il y a un match *)
+                                    | 0 => fail (* ce cas n'arrive pas car on matche forcémeent sur une variable introduite *)
+                                    | S ?p => instantiate (n_evar := p) ;  (* on chope p à la fin et on la met *)
                                               let Ty := type of x in let T' := remove_app Ty in
-                                              instantiate (T_evar := T') 
+                                              instantiate (T_evar := T') (* le type de la variable matchée *)
                                      end 
-      | |- forall _, _ => let y := fresh in intro y; tac_rec (S m) y 
+      | |- forall _, _ => let y := fresh in intro y; tac_rec (S m) y (* si forall, on introduit
+   y une prémisse, on incrémente m *)
       | _ => fail 
       end
+  (* \Rq: les evar permettent qu'une variable dépasse sa portée *)
 in
-    tac_rec 0 ltac:(fresh) ;
-    destruct HFalse
+    tac_rec 0 ltac:(fresh) ; (* fresh  *)
+    destruct HFalse (* ici, on a fini de compter, on va clear H' *)
   | clear H' ; let indu := eval unfold T in T in 
 create_evars_for_each_constructor indu ; let foo := fresh in assert 
-(foo : False -> U) by 
+(foo : False -> U) by   (* pourquoi deuxième intro de False -> U ??? *)
 (let Hfalse' := fresh in intro Hfalse' ; 
-let nb_var := eval unfold n in n in
+let nb_var := eval unfold n in n in (* pq besoin de eval unfold n ??? parce que Ltac ne déroule pas la def*)
 let t := intro_and_tuple nb_var in 
-let var_match := eval cbv in (head_tuple _ _ t) in 
+let var_match := eval cbv in (head_tuple _ _ t) in  
 let var_to_revert := eval cbv in (tail_tuple _ _ t) in 
-case var_match ; 
+case var_match ; (* crée autant de sous-buts que de constructeurs *)
 let indu' := type of var_match in clear var_match ; 
-revert_tuple_clear var_to_revert indu' ;
+revert_tuple_clear var_to_revert indu' ; (* on revert: on fait des quantif univ *)
 match goal with 
 | u : Prop |- ?G => instantiate (u := G) ; destruct Hfalse' end)
+(* idées: les evars créées plus haut sont de type Prop et ce sont les seuls objets
+de type Prop dans le contexte, du coup, cette partie ne marche que pour les evars *)
 ; clear foo ; 
-repeat match goal with 
+repeat match goal with (* maintenant, partie preuve *)
 | u : Prop |-_ => let H0 := fresh in let u' := eval unfold u in u in assert (H0 : u') by 
 ( intros; try (rewrite H); reflexivity); clear u ; try (eliminate_dependent_pattern_matching H0)end] ; clear H ; 
 clear n; clear T.
+ 
+Ltac is_a_variable x :=
+let x':= metacoq_get_value (tmQuote x) in 
+match x' with 
+| tVar _ => idtac
+| _ => fail
+end.
 
+Ltac elim_match_with_no_forall H :=
+  let U := type of H in 
+  match U with 
+| context C[match ?expr with _ => _ end] => 
+    let Ty := type of expr in 
+    let T' := remove_app Ty in 
+    create_evars_for_each_constructor T' ;
+    let foo := fresh in 
+    assert (foo : False -> U) 
+by (let Hfalse := fresh in
+intro Hfalse ; tryif (is_a_variable expr)
+then (case expr)
+else (case_eq expr) ;
+match goal with 
+| u : Prop |- ?G => instantiate (u := G); destruct Hfalse
+end) ; clear foo ; 
+repeat match goal with 
+| u : Prop |-_ => let H0 := fresh in let u' := eval unfold u in u in assert (H0 : u')  by 
+(first [ try (rewrite H); reflexivity
+|intros ; match goal with 
+| Hinv : _ |- _ => rewrite Hinv in H ; auto
+end]); try elim_match_with_no_forall H0 ; clear u 
+end
+end ; clear H.
 
 Module Tests.
 
@@ -453,7 +490,7 @@ Goal ((forall (A: Type) (x : A) (a : A) (l : list A),
 | y :: xs => y
 end)).
 get_definitions_theories unit ltac:(fun H => expand_hyp_cont H ltac:(fun H' => 
-eliminate_pattern_matching H' 1)). assumption.
+eliminate_pattern_matching H' 1)). assumption. (* a quoi sert la continuation ici ???? *)
 Qed.
 
 
