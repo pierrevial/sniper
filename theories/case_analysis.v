@@ -358,7 +358,7 @@ constr:(tr_rev ln)
 in 
  let rec aux llAu' ln' k  acc :=
 let y := constr:(((k,llAu'),ln')) 
-in match eval hnf in y with
+in lazymatch eval hnf in y with
 | (?y0 , ?ln0') => 
   match eval cbv in ln0' with
   | (@nil nat) =>   constr:(acc) 
