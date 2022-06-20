@@ -538,6 +538,21 @@ Definition dom_list_f ( B  :  term) (n : nat)  :=
   in dlaux B n [].
 
 
+
+Definition dom_list_f0 ( B  :  term) (n : nat)  := 
+    (* takes a type B := Prod A1 ... An . B'  and outputs [A1; ... ; An], at least if no dependencies *)
+    (* does not handle debruijn indices *)
+    let fix dlaux B n acc :=
+    match n with
+    | 0 => tr_rev acc
+    | S n => match B with
+            | tProd na A B' =>  dlaux B' n (A :: acc)
+            | _ => [] (* this case shouldn't happen *)
+            end            
+  end
+  in dlaux B n [].
+
+
 (* given an 'inductive' and i, the rank of an inductive body, 
   outputs the 'inductive' associated to the same inductive type, whose rank is i 
 *)

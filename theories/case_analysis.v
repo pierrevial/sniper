@@ -537,8 +537,7 @@ Ltac gen_statement t :=
      let gct := eval compute in  (get_ctors_and_types_i indu p 1 0 u  oind) 
    in  lazymatch eval hnf in gct with 
     | (?lBfA,?ln) => lazymatch eval hnf in lBfA with
-      | (?lBf,?llA) =>  lazymatch eval cbv in lBf with
-        | (?lB,?lc) =>    let llAtrunc := eval compute in (tr_map (skipn p) llA) in  let nc := eval compute in (leng ln) in 
+      | (?lc,?llA) => let llAtrunc := eval compute in (tr_map (skipn p) llA) in  let nc := eval compute in (leng ln) in 
         let lP_rev := eval compute in (tr_rev lP) in let llAu := eval compute in (proj_return_types llAtrunc) in let t_reif := constr:(tInd indu u) in  let N := constr:(fold_left Nat.add ln 0) in
         let res3 := 
          declare_projs t p lP_rev t_reif indu llAu ln nc in let llprojs := fresh "llprojs" in 
@@ -549,7 +548,6 @@ Ltac gen_statement t :=
       (* clearbody_tVar_llist llprojs; *) (* unfold gent in Helim ; *) (* subst gent ; *)  clear gent indmind llprojs (* \TODO add clearbody  *)
         end 
       end
-    end
     end
   end end end end in Helim
   .       
