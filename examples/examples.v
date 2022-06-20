@@ -45,7 +45,7 @@ Section Generic.
        decidable. On usual types such as `Z` in the previous example,
        these goals are automatically discharged. On other concrete
        types, it is up to the user to prove it or admit it. *)
-  Abort.
+   Abort.
 
   (* On abstract type, it has to be assumed. *)
   Hypothesis HA : CompDec A.

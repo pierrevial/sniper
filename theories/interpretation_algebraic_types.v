@@ -243,7 +243,7 @@ Definition is_inj (B f : term ) (lA : list term) (p : nat)  :=
     match (k , l2) with 
     | (0, _) =>  (dB1 , dB2 , andeq )  
     | (S k, []) => aux2 k (i+1) [] ((tRel i) :: dB1 ) ((tRel i) :: dB2) andeq
-   (* | (S k, [A'] ) => aux2 k (i + 2) [] (tRel (i+1) :: dB1)  ((tRel i) :: dB2)  (mkEq  A' (tRel (S (S i))) (tRel (S i) )) *) 
+    (* | (S k, [A'] ) => aux2 k (i + 2) [] (tRel (i+1) :: dB1)  ((tRel i) :: dB2)  (mkEq  A' (tRel (S (S i))) (tRel (S i) )) *) 
     | (S k, A' :: l2) =>  aux2 k (i + 2)  l2 ( (tRel (i+1)) :: dB1 ) ((tRel i) :: dB2 ) (mkAnd (mkEq  A' (tRel (S (S i))) (tRel (S i) )) andeq) 
     end in 
     (* let '((dB1 , dB2), andeq) := aux2 n 0 l2 [] [] True_reif in *)
@@ -269,11 +269,11 @@ Ltac ctor_is_inj B f lA  n p :=
    match n with
    | 0 => idtac 
    | S _ => let Hu := fresh "H"  in  
-  (pose_unquote_term_hnf (is_inj B f lA  p) Hu ); let t := fresh "H" in assert (t:Hu)   ; [  unfold Hu ; intros ;
+  (pose_unquote_term_hnf (is_inj B f lA p) Hu ); let t := fresh "H" in assert (t:Hu)   ; [  unfold Hu ; intros ;
  match goal with  
  | h : _ = _ |- _ =>  progress (inversion h)   
  end  ; 
- repeat split  | ..]   ; subst Hu
+ repeat split  | ..] ; subst Hu
    end.
 
 
@@ -301,45 +301,43 @@ Ltac ctors_are_inj_tac lB lf lA ln p :=
 (*** Disjoints codomains ***)
 
 
-
-Definition new_codom_disj (B f g: term)  (lAf lAg : list term) (p : nat)  :=
+(* \TODO  seems that lAf and lAg both contains the parameters P_0... P_{p-1}
+           thus, removing them could be avoided
+*)
+Definition codom_disj (B f g: term)  (lAf lAg : list term) (p : nat)  :=
   let (n,n') := (leng lAf , leng lAg) in 
    let (d,d') := ( n - p, n' - p) in 
-    let fix removeandlift p l :=
+    let fix removeandlift p l := (* \TODO removeandlift probably already exists *)
       match (p, l)  with
-      | (0 , _) => tr_rev (lAf ++ tr_map (lift0 d) l) (* \TODO not tail-recursive, optimize *)
+      | (0 , _) => rev_append (tr_map (lift0 d) l) (tr_rev lAf)
       | ( S p , x :: l) => removeandlift p l 
       | ( S _, []) => [] (* this case doesn't happen *)
       end 
     in let lQ := removeandlift p lAg 
-    in let fix aux2 p i dB  :=
-      match p with 
-      | 0 => dB
-      | S p => aux2  p (S i)  ((tRel i) :: dB)
-      end 
-     in let (dB1,dB2) := (aux2 d d'  [], aux2 d' 0 []) 
-     in let fix aux3 p i l1 l2 :=
+    in 
+     let (dB1,dB2) := (Rel_list d d' , Rel_list d' 0) 
+     in let fix aux3 p i l1 l2 :=     
        match p with
        | 0 => (l1,l2)
        | S p => aux3 p (S i)  (tRel i :: l1) (tRel i :: l2)
        end 
-      in let (l1,l2) := aux3 p (d + d') dB1 dB2 in
+      in let (l1,l2) := aux3 p (d + d') dB1 dB2   
+      in
       let fix aux3  l t := match l with
       | [] => t 
       | A' :: l => aux3 l (tProd (mkNamed "x") A' t)
-      end in   aux3 lQ (mkNot (mkEq (lift0 d' B) (tApp (cutEvar f) l1) (tApp (cutEvar g) l2))).  
+      end in aux3 lQ (mkNot (mkEq (lift0 d' hole) (tApp (cutEvar f) l1) (tApp (cutEvar g) l2))).  
 
 Ltac codom_disj_discr B f g lAf lAg p:=
-  let H := fresh "H" in (pose_unquote_term_hnf (new_codom_disj B f g lAf lAg p) H); 
-  assert  H ; [unfold H ; intros ;
-  try discriminate | .. ]  ; subst H. 
+  let H := fresh "H" in (pose_unquote_term_hnf (codom_disj B f g lAf lAg p) H); 
+  assert  H ; [unfold H ; intros ; try discriminate | .. ]  ; subst H. 
 
 
 
 Ltac pairw_aux B f lAf lf lA p :=
      lazymatch constr:((lf , lA)) with
         | ([] , []) => idtac 
-        | (?f1 :: ?tllf , ?A1 :: ?tllA ) => codom_disj_discr B f f1 lAf A1 p  ;pairw_aux B f lAf tllf tllA p  
+        | (?f1 :: ?tllf , ?A1 :: ?tllA ) => codom_disj_discr B f f1 lAf A1 p ; pairw_aux B f lAf tllf tllA p  
         | _ => idtac "wrong branch pairw_aux"  ; fail                               
       end.
  
