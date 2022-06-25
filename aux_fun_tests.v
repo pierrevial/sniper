@@ -14,11 +14,6 @@
 (* j: rank of case in a pattern-matching (constructor tCase): starts from 1 *)
 (* REMPLACER : cela devrait être nc*)   
 
-
-
-(* use reflexivity to automatize these unit tests
-*)
-
 Require Import utilities. 
 Require Import interpretation_algebraic_types.
 Require Import elimination_polymorphism.
@@ -421,84 +416,14 @@ Abort.
 
 Goal False. 
 
-
-pose_gen_statement @nat. clear. 
-pose_gen_statement @biclist. clear.
 pose_gen_statement list. 
+pose_gen_statement @nat.
+pose_gen_statement @biclist.
 pose_quote_term (fun (A : Type) (x x0 : list A) =>
 match x0 with
 | [] => x
 | _ :: x1 => x1
 end ) pl1.
-pose_quote_term proj_list proj_list_reif.
-
-assert (pl1 = ((fun u1 =>
-tLambda {| binder_name := nNamed "A"; binder_relevance := Relevant |}
-         (tSort u1)
-         (tLambda
-            {| binder_name := nNamed "x"; binder_relevance := Relevant |}
-            (tApp
-               (tInd
-                  {|
-                    inductive_mind :=
-                      (MPfile ["Datatypes"; "Init"; "Coq"], "list");
-                    inductive_ind := 0
-                  |} []) [tRel 0])
-            (tLambda
-               {| binder_name := nNamed "x0"; binder_relevance := Relevant |}
-               (tApp
-                  (tInd
-                     {|
-                       inductive_mind :=
-                         (MPfile ["Datatypes"; "Init"; "Coq"], "list");
-                       inductive_ind := 0
-                     |} []) [tRel 1])
-               (tCase
-                  ({|
-                     inductive_mind :=
-                       (MPfile ["Datatypes"; "Init"; "Coq"], "list");
-                     inductive_ind := 0
-                   |}, 1, Relevant)
-                  (tLambda
-                     {|
-                       binder_name := nNamed "x0";
-                       binder_relevance := Relevant
-                     |}
-                     (tApp
-                        (tInd
-                           {|
-                             inductive_mind :=
-                               (MPfile ["Datatypes"; "Init"; "Coq"], "list");
-                             inductive_ind := 0
-                           |} []) [tRel 2])
-                     (tApp
-                        (tInd
-                           {|
-                             inductive_mind :=
-                               (MPfile ["Datatypes"; "Init"; "Coq"], "list");
-                             inductive_ind := 0
-                           |} []) [tRel 3])) (tRel 0)
-                  [(0, tRel 1);
-                  (2,
-                  tLambda
-                    {|
-                      binder_name := nNamed "a"; binder_relevance := Relevant
-                    |} (tRel 2)
-                    (tLambda
-                       {|
-                         binder_name := nNamed "x1";
-                         binder_relevance := Relevant
-                       |}
-                       (tApp
-                          (tInd
-                             {|
-                               inductive_mind :=
-                                 (MPfile ["Datatypes"; "Init"; "Coq"],
-                                 "list");
-                               inductive_ind := 0
-                             |} []) [tRel 3]) (tRel 0)))])))) (match pl1 with | tLambda _ (tSort s) _ => s | _ => (Universe.of_levels (inr (Level.Level "aux_fun_tests.1376")))))) by reflexivity. 
-
-
 pose_quote_term (fun (A : Type) (x : A) (x0 : list A) =>
 match x0 with
 | [] => x
@@ -582,9 +507,7 @@ Abort.
 
 
 Goal False.
-let x := constr:(is_inj (tApp list_reif [tRel 2]) cons_reif [Set_reif ; tRel 0 ; tApp list_reif [tRel 1]] 1 ) in pose x as is_inj_cons ; compute in is_inj_cons.
-pose_unquote_term_hnf is_inj_cons kik.
-clear.
+let x := constr:(is_inj (tApp list_reif [tRel 2]) cons_reif [tRel 0 ; tApp list_reif [tRel 1]] 1 ) in pose x as is_inj_cons ; compute in is_inj_cons.
 Abort.
 
 

@@ -70,10 +70,17 @@ Proof. intros A HA n ; induction n.
   - snipe2.
   - intros l ; destruct l.
     * snipe2.
-    
-    * scope. pose_gen_statement option. specialize (gen_option A). verit.
- (* \TODO currently, scope does not produce the gen statement for option *)
-(* \Q is verit quicker if one removes the useless hypotheses? *)
+    * scope. unfold nth_default. rewrite H2 with (H16 := a). simpl. rewrite <- IHn. remember (nth_error l n) as kik. 
+     destruct kik;  symmetry. apply H4. symmetry. assumption. 
+            apply H10. symmetry. assumption.
+                  
+ (* get_projs_st (option). simpl. rewrite <- IHn. destruct (nth_error l n) as [ x | ].      
+ unfold nth_default. simpl.   rewrite -> IHn.
+
+  apply H4. simpl. rewrite <- IHn. assert (H : nth_erro l n
+
+specialize (gen_option A a) as kik. destruct kik with (x := nth_error l n).
+  Fail specialize (H2 A a). (* verit. *) *)
 Qed.
 
 (* Test polymorphism *) 
