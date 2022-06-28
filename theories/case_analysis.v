@@ -106,7 +106,7 @@ tProd Au_{0,0}^{+0} Au_{0,1}^{+1} ... Au_{0,j}^{+j} ... Au_{0,n_0-1}^{+n_0-1}
       .... Au_{i,j}^{N_i+j}... Au_{k-1,n_k-1}^{N-1}
 tProd (x : (I')^{+N})
   or_reif 
-     eq_reif _ (tRel 0)  pstat_0 ; 
+     eq_reif _ (tRel 0) pstat_0 ; 
      eq_reif _ (tRel 0) pstat_1 ; ... ;
      eq_reif _ (tRel 0) pstat_{k-1}
 where pstat_i := C_i [ _p ; 
@@ -498,26 +498,24 @@ intro x ; destruct x; repeat first [first [reflexivity | right ; reflexivity] | 
 | S ?m => let y := fresh in intro y ; prove_by_destruct_varn m 
 end.
 
-
-
+Definition stoid (s : string ) : ident := s.
 
 (*  \TMP *)
-(* Ltac clearbody_tVar_list l :=
+Ltac clearbody_tVar_list l := idtac "blut 0" ; 
   match eval hnf in l with
-  | [] => idtac 
-  | ?c :: ?l0 => match c with
-    | tVar ?idn => cbd idn ; clearbody_tVar_list l0
+  | ?ctor :: ?l0 => idtac "blut 1" ; match eval hnf in ctor with
+    | tVar ?idn => idtac "blut2" ; let x := constr:(stoid idn) in 
+    let _ := match goal with _ => clearbody x end in clearbody_tVar_list l0
 end
-end. *)
+end. 
 
-(* Ltac clearbody_tVar_llist l :=
+
+
+Ltac clearbody_tVar_llist l :=
   match eval hnf in l with
-  | [] => idtac 
-  | ?l0 :: ?tl0 => clearbody_tVar_list l0 ; clearbody_tVar_llist tl0
-end. *)
-
-(* \TODO move up the definition of nat_oind. In utilities.v? *)
-
+  | [] => idtac "blut 5" 
+  | ?l0 :: ?tl0 => idtac "blut 6" ; clearbody_tVar_list l0 ; idtac "blut 7";  clearbody_tVar_llist tl0
+end. 
 
 
 Ltac gen_statement t := 
@@ -535,7 +533,8 @@ Ltac gen_statement t :=
      let gct := eval compute in  (get_ctors_and_types_i indu p 1 0 u  oind) 
    in  lazymatch eval hnf in gct with 
     | (?lBfA,?ln) => lazymatch eval hnf in lBfA with
-      | (?lc,?llA) => let llAtrunc := eval compute in (tr_map (skipn p) llA) in  let nc := eval compute in (leng ln) in 
+      | (?lBf,?llA) =>  lazymatch eval cbv in lBf with
+        | (?lB,?lc) =>    let llAtrunc := eval compute in (tr_map (skipn p) llA) in  let nc := eval compute in (leng ln) in 
         let lP_rev := eval compute in (tr_rev lP) in let llAu := eval compute in (proj_return_types llAtrunc) in let t_reif := constr:(tInd indu u) in  let N := constr:(fold_left Nat.add ln 0) in
         let res3 := 
          declare_projs t p lP_rev t_reif indu llAu ln nc in let llprojs := fresh "llprojs" in 
@@ -543,23 +542,68 @@ Ltac gen_statement t :=
         let ltypes_forall := constr:(bind_def_val_in_gen llAu ln) in 
         let ggd := constr:(mkProd_rec_n "A" lP_rev (mkProd_rec_n "d" ltypes_forall (get_generation_disjunction  p t_reif N  lc  llprojs  ln))) in 
           let gent := fresh "gen_stat" t in pose_unquote_term_hnf ggd gent  ; let N' := eval compute in (p + N) in assert (Helim : gent) by prove_by_destruct_varn N' ; unfold gent in Helim ; 
-      (* clearbody_tVar_llist llprojs; *) (* unfold gent in Helim ; *) clear gent indmind llprojs (* \TODO add clearbody  *)
+      (* clearbody_tVar_llist llprojs; *) (* unfold gent in Helim ; *) (* subst gent ; *)  clear gent indmind llprojs (* \TODO add clearbody  *)
         end 
       end
+    end
     end
   end end end end in Helim
   .       
    
 
-Ltac pose_gen_statement t :=
-let x := gen_statement t in idtac. (* pose x as gent *)
 
+
+
+Ltac pose_gen_statement t :=
+let x := gen_statement t in idtac.
+(* pose x as gent *)
+
+
+
+(* \TMP *)
+Ltac gen_blut t := 
+  let Helim := fresh "gen_" t in let _ := match goal with _ => 
+  let indmind := fresh "indmind" in info_indu t indmind ; 
+  lazymatch eval compute in indmind with
+  | (?induu,?mind) => 
+    lazymatch eval hnf in induu with
+    | (?indu, ?u) =>
+    let pparams := eval compute in (get_params_from_mind mind) in
+    lazymatch eval hnf in pparams with 
+    | (?p,?lP) =>
+    lazymatch eval hnf in pparams with
+    | (?p, ?lP) => let oind := eval compute in (hd nat_oind mind.(ind_bodies)) in
+     let gct := eval compute in  (get_ctors_and_types_i indu p 1 0 u  oind) 
+   in  lazymatch eval hnf in gct with 
+    | (?lBfA,?ln) => lazymatch eval hnf in lBfA with
+      | (?lBf,?llA) =>  lazymatch eval cbv in lBf with
+        | (?lB,?lc) =>    let llAtrunc := eval compute in (tr_map (skipn p) llA) in  let nc := eval compute in (leng ln) in 
+        let lP_rev := eval compute in (tr_rev lP) in let llAu := eval compute in (proj_return_types llAtrunc) in let t_reif := constr:(tInd indu u) in  let N := constr:(fold_left Nat.add ln 0) in
+        let res3 := 
+         declare_projs t p lP_rev t_reif indu llAu ln nc in let llprojs := fresh "llprojs" in 
+         pose (llprojs  := res3) ;  clear indmind
+end
+end
+end end end end end end in idtac.
+
+(* \TMP *)
+Goal False.
+gen_blut list.
+(* clearbody_tVar_llist llprojs. *)
+Abort.
 
 (* \TMP *)
 Ltac get_projs_st_return t := gen_statement t. 
 
-
-
+(* \TMP *)  
+Goal False.
+pose_gen_statement list.
+pose_quote_term proj_list p1_reif.
+pose_quote_term proj_list0 p0_reif.
+pose [p1_reif ; p0_reif ] as blut.
+idtac "RESET". (* \TODO *)
+Fail clearbody_tVar_list blut. 
+Abort.
 
 (* \TMP *)
 Ltac get_projs_st t := pose_gen_statement t.

@@ -224,9 +224,41 @@ Definition cutEvar (t: term) :=
 
 
 
- (* is_inj B f [A1 ; ... ; An ] is the reification of 
- *) 
-Definition is_inj (f : term ) (lA : list term) (p : nat)  :=
+ (* is_inj B f [A1 ; ... ; An ] p is the reification of 
+   the formula specifying the injectivity of f, i.e.
+   forall (x1 : A1) (x1' : A1)... (xn : An) (xn' : An), f x1 ... xn = f x1' ... xn' -> (x1 = x1') /\ ... /\ (x1' = xn')
+   where
+   - A1, ..., An are the types of the n arguments of f
+   - B is the return type of f
+   - p is the number of (type) parameters of f, i.e. arguments that should be quantified once and not twice (e.g. A below)
+   For instance, is_inj (tApp list_reif [tRel 2]) cons_reif [Set_reif ; tRel 0 ; tApp list_reif [tRel 1]] 1
+   outputs the reification of 
+   forall (A : Set) (a1 a2: A) (l1 l2 : list A), a1 :: l1 = a2 = l2 -> (a1 = a2) /\ (l1 = l2) 
+   Remark: is_inj does not work with intricate type dependencies
+   Technically, the output looks like:
+   tProd "X1" A1 ... tProd "Xp" Ap
+   tProd "a_{p+1}" A_{p+1} tProd "a'_{p+1}" A_{p+1}^{+1}
+   tProd "a_{p+2}" A_{p+2} tProd "a'_{p+1}" A_{p+1}^{+3}
+   ...
+   tProd "a_n" A_n^{???} tProd "a'_n" A_{n}^{???}
+   mkImpl 
+     mkEq B^{+ n - p} 
+       (tApp f [tRel (2 * n - p ) ; tRel (2 * n - p -1) ; ... 
+          ; tRel (2 * n - 2 * p ) ;   (* p indices, decrase by 1*)
+          tRel (2 * n - 2 * p - 1) ; ... ; tRel 3 ; tRel 1 (* n - p indices, decrease by 2 *)
+          ])
+       (tApp g tRel (2 * n - p ) ; tRel (2 * n - p -1) ; ... 
+          ; tRel (2 * n - 2 * p ) ;  (* p indices, decrase by 1*)
+          tRel (2 * n - 2 * p - 2) ; ... ; tRel 2 ; tRel 0 (* n - p indices, decrease by 2 *)
+          ])
+    mkAnd_n 
+      [ mkEq A_{p+1}^{+ 2 n + 1 - 2 p } (tRel (2 n - 2 p) ) (tRel (2 n - 2 p -1))  ; ... ;
+        mkEq A_{j}^{+ 2 n + 2 - p - j } (tRel (n + 2 - j)) (tRel (n + 1 - j)); ... ;
+        mkEq A_n^{+ n + 1 - p } (tRel 2) (tRel 1) ]
+   *) 
+   (* TODO spec should perhaps be written with [A0 ; ... ; A_{n-1}] instead of [A1 ; ... ; An] *)
+   (* TODO check whether andeq is optimally built... *)
+Definition is_inj (B f : term ) (lA : list term) (p : nat)  :=
   let n := leng lA in 
   let d := n - p in let f' := cutEvar f in 
   let fix aux1 (lA : list term) (p i j : nat) (l1 l2 : list term) :=
@@ -237,16 +269,14 @@ Definition is_inj (f : term ) (lA : list term) (p : nat)  :=
      aux1 lA 0 (i+1) (j - 2) (((lift0 1 A') :: A' :: l1) ) (A'' :: l2) 
     | (A :: lA, S p) =>   aux1 lA  p i j (A :: l1) l2
     end 
-  in let (l1, l2) := aux1 lA p 0 (S(2 * d)) [] [] in 
+  in let (l1, l2) := aux1 lA p 0 (S (2 * d)) [] [] in 
   let d' := 2 * d - 2 in 
   let fix aux2 (k i  : nat) (l2 dB1 dB2 : list term) (andeq : term) :=
     match (k , l2) with 
     | (0, _) =>  (dB1 , dB2 , andeq )  
     | (S k, []) => aux2 k (i+1) [] ((tRel i) :: dB1 ) ((tRel i) :: dB2) andeq
-   (* | (S k, [A'] ) => aux2 k (i + 2) [] (tRel (i+1) :: dB1)  ((tRel i) :: dB2)  (mkEq  A' (tRel (S (S i))) (tRel (S i) )) *) 
     | (S k, A' :: l2) =>  aux2 k (i + 2)  l2 ( (tRel (i+1)) :: dB1 ) ((tRel i) :: dB2 ) (mkAnd (mkEq  A' (tRel (S (S i))) (tRel (S i) )) andeq) 
     end in 
-    (* let '((dB1 , dB2), andeq) := aux2 n 0 l2 [] [] True_reif in *)
     let '((dB1 , dB2), andeq) := 
     let '(((((n',i'),l2'),dB1'),dB2'),andeq') := 
     match (n,l2) with 
@@ -260,90 +290,113 @@ Definition is_inj (f : term ) (lA : list term) (p : nat)  :=
       match l1 with 
       | [] => t
       |  A :: l1 => aux3 l1 (tProd (mkNamed "x") A t)
-      end in aux3 l1 (tProd mkNAnon (mkEq hole (tApp f' dB1) (tApp f' dB2)) andeq)   
+      end in aux3 l1 (tProd mkNAnon (mkEq (lift0 d B) (tApp f' dB1) (tApp f' dB2)) andeq)   
     . 
 
 
-
-Ltac ctor_is_inj f lA  n p := 
+(* ctor_is_inj *asserts* (the unquote of) the output of is_inj and *proves* it *)
+Ltac ctor_is_inj B f lA  n p := 
    match n with
    | 0 => idtac 
    | S _ => let Hu := fresh "H"  in  
-  (pose_unquote_term_hnf (is_inj B f lA  p) Hu ); let t := fresh "H" in assert (t:Hu)   ; [  unfold Hu ; intros ;
+  (pose_unquote_term_hnf (is_inj B f lA p) Hu ); let t := fresh "H" in assert (t:Hu)   ; [  unfold Hu ; intros ;
  match goal with  
  | h : _ = _ |- _ =>  progress (inversion h)   
  end  ; 
- repeat split  | ..]   ; subst Hu
+ repeat split  | ..] ; subst Hu
    end.
 
 
 
-Ltac ctors_are_inj_tac lf lA ln p :=  
+(* ctors_are_inj_tac [B1; ... ; Bk] [f1 ; ... ; fk] [lA1 ; ... ; lA2] [n1 ; ... ; nk] p 
+   asserts and proves the injectivity of f1, ..., fk, i.e. it is equivalent to
+   ctor_is_inj B1 f1 lA1 n1 p ; ... ; ctor_is_inj B1 fk lAk nk p
+*)   
+Ltac ctors_are_inj_tac lB lf lA ln p :=  
   match lA with
   |  nil  => idtac 
   | ?A1 :: ?tlA => 
     match lf with 
     | nil => idtac "Wrong branch 1 ctors_are_inj" 
-    | ?f1 :: ?tlf =>    
+    | ?f1 :: ?tlf =>
+      match lB with
+      | nil => idtac "Wrong branch 2 ctors_are_inj"    
+      | ?B1 :: ?tlB =>
         match ln with
         | nil => idtac "Wrong branch 3 ctors_are_inj"
         | ?n1 :: ?tln  => let Hnew := fresh "H" in 
-   ctor_is_inj f1 A1 n1 p ;  
-   ctors_are_inj_tac tlf tlA tln p          
+   ctor_is_inj B1 f1 A1 n1 p ;  
+   ctors_are_inj_tac tlB tlf tlA tln p 
+         end
+      end      
     end
-  end
   end.
   
 (*** Disjoints codomains ***)
 
 
-
-Definition new_codom_disj (B f g: term)  (lAf lAg : list term) (p : nat)  :=
+(*  codom_disj B f g [A1 ; ... ;  Ak] [A1' ; ... ; A'_{k'}] p 
+    outputs the reification of the statements specifying that
+    f x1 ... xk can never be equal to g x1' ... x'_{k'} where 
+    - B is the codomain of f (the codomain of g is a un/lift of B)
+    - f (resp. g) has k (resp. k') arguments
+    - p is the number of common (type) parameters of f and g
+      (thus, x1 = x1', ... xp = x'_{p'} )
+    - A1, ... , Ak are the types of the arguments of f
+    - A1, ... , A'_{k'} are the types of the arguments of g
+    Does not work with intricate dependencies 
+    Technically, the ouput looks like
+    tProd "X1" A1 ... tProd "Xp" Ap 
+    tProd "a_{p+1}"  A_{p+1} ... tProd "a_k" A_k
+    tProd "a'_{p+1}" A1^{+k-p} ... tProd "a'_{k'}" A'_{k'}^{+k-p}  
+    mkNot 
+      mkEq B^{k'-p} 
+        (tApp f [tRel n ; ... tRel n-k+1 ] ) (* \TODO check *)
+        (tApp g [tRel n ; ... ; tRel n-p + 1] ; tRel k'-p-1 ; ... ; tRel 0 ])      
+  *)
+  (* \TODO change metavariables form n n' to k k' (or the reverse above )*)
+Definition codom_disj (B f g: term)  (lAf lAg : list term) (p : nat)  :=
   let (n,n') := (leng lAf , leng lAg) in 
    let (d,d') := ( n - p, n' - p) in 
-    let fix removeandlift p l :=
+    let fix removeandlift p l := (* \TODO removeandlift probably already exists *)
       match (p, l)  with
-      | (0 , _) => tr_rev (lAf ++ tr_map (lift0 d) l) (* \TODO not tail-recursive, optimize *)
+      | (0 , _) => rev_append (tr_map (lift0 d) l) (tr_rev lAf)
       | ( S p , x :: l) => removeandlift p l 
       | ( S _, []) => [] (* this case doesn't happen *)
       end 
     in let lQ := removeandlift p lAg 
-    in let fix aux2 p i dB  :=
-      match p with 
-      | 0 => dB
-      | S p => aux2  p (S i)  ((tRel i) :: dB)
-      end 
-     in let (dB1,dB2) := (aux2 d d'  [], aux2 d' 0 []) 
-     in let fix aux3 p i l1 l2 :=
+    in 
+     let (dB1,dB2) := (Rel_list d d' , Rel_list d' 0) 
+     in let fix aux3 p i l1 l2 :=     
        match p with
        | 0 => (l1,l2)
        | S p => aux3 p (S i)  (tRel i :: l1) (tRel i :: l2)
        end 
-      in let (l1,l2) := aux3 p (d + d') dB1 dB2 in
+      in let (l1,l2) := aux3 p (d + d') dB1 dB2   
+      in
       let fix aux3  l t := match l with
       | [] => t 
       | A' :: l => aux3 l (tProd (mkNamed "x") A' t)
-      end in   aux3 lQ (mkNot (mkEq (lift0 d' B) (tApp (cutEvar f) l1) (tApp (cutEvar g) l2))).  
+      end in aux3 lQ (mkNot (mkEq (lift0 d' hole) (tApp (cutEvar f) l1) (tApp (cutEvar g) l2))).  
 
 Ltac codom_disj_discr B f g lAf lAg p:=
-  let H := fresh "H" in (pose_unquote_term_hnf (new_codom_disj B f g lAf lAg p) H); 
-  assert  H ; [unfold H ; intros ;
-  try discriminate | .. ]  ; subst H. 
+  let H := fresh "H" in (pose_unquote_term_hnf (codom_disj B f g lAf lAg p) H); 
+  assert  H ; [unfold H ; intros ; try discriminate | .. ]  ; subst H. 
 
 
 
-Ltac pairw_aux f lAf lf lA p :=
+Ltac pairw_aux B f lAf lf lA p :=
      lazymatch constr:((lf , lA)) with
         | ([] , []) => idtac 
-        | (?f1 :: ?tllf , ?A1 :: ?tllA ) => codom_disj_discr B f f1 lAf A1 p  ;pairw_aux B f lAf tllf tllA p  
+        | (?f1 :: ?tllf , ?A1 :: ?tllA ) => codom_disj_discr B f f1 lAf A1 p ; pairw_aux B f lAf tllf tllA p  
         | _ => idtac "wrong branch pairw_aux"  ; fail                               
       end.
  
     
-Ltac pairw_disj_codom_tac lf lA p := lazymatch eval hnf in lf with
+Ltac pairw_disj_codom_tac B lf lA p := lazymatch eval hnf in lf with
   | [] => idtac  
   | ?f1 :: ?tllf => lazymatch eval hnf in lA with 
-    ?A1 :: ?tllA  => pairw_aux f1 A1 tllf tllA p  ; pairw_disj_codom_tac tllf tllA p 
+    ?A1 :: ?tllA  => pairw_aux B f1 A1 tllf tllA p  ; pairw_disj_codom_tac B tllf tllA p 
   | _ =>   idtac "wrong branch pair_disj_codom_tac"  
   end
   end.
@@ -354,17 +407,17 @@ Ltac pairw_disj_codom_tac lf lA p := lazymatch eval hnf in lf with
 
         
 
-Fixpoint is_in_codom (t f: term ) (lA : list term) :=
+Fixpoint is_in_codom (B t f: term ) (lA : list term) :=
   (* if t : A and f : Pi lx lA . A, tells when t is in the codomain of f: returns exist vecx : lA, f vecx = t  *)
   match lA with
-  | [] => tApp eq_reif [hole ; t ; f]
-  | A :: tllA => tApp ex_reif [A ;  tLambda (mkNamed "x") A   (is_in_codom (lift0 1 t) (tApp (lift0 1 f) [tRel 0] ) tllA )]
+  | [] => tApp eq_reif [B ; t ; f]
+  | A :: tllA => tApp ex_reif [A ;  tLambda (mkNamed "x") A   (is_in_codom B (lift0 1 t) (tApp (lift0 1 f) [tRel 0] ) tllA )]
   end.
 (* base case : f is 0-ary and  t is just f *)
 
 
 
-Definition union_direct_total (lf : list term) (lD : list (list term) ) (p : nat) :=
+Definition union_direct_total (lB : list term ) (lf : list term) (lD : list (list term) ) (p : nat) :=
   let lD' := tr_map(fun l => (@List.skipn term p l)) lD in 
   let lLen := tr_map  (fun l => (@leng term l) ) lD' in 
   let fix aux0 k i l  :=
@@ -380,16 +433,16 @@ Definition union_direct_total (lf : list term) (lD : list (list term) ) (p : nat
     | A :: lArev => aux1 lArev (tApp ex_reif [(lift0 1 A) ; tLambda (mkNamed "x") (lift0 1 A) t])
     end 
   in 
-  let aux2 f lA k := aux1 (tr_rev lA) (mkEq hole (tRel k) (tApp f (aux0 p (k+1) (aux0 k 0 [])))) in 
-  let fix aux3 lf lD lLen t := 
-    match ((lf , lD), lLen )  with
-    | (([] ,[]),[]) => t
+  let aux2 B f lA k := aux1 (tr_rev lA) (mkEq (lift0 1 B) (tRel k) (tApp f (aux0 p (k+1) (aux0 k 0 [])))) in 
+  let fix aux3 lB lf lD lLen t := 
+    match (((lB, lf) , lD), lLen )  with
+    | ((([], []),[]),[]) => t
    (* | ([f], [lA],[d]) => aux2  lA f d  ??? *)
-    | (( f:: lf, lA :: lD), d :: lLen) => aux3 lf lD lLen (mkOr (aux2 (cutEvar f) lA d) t)
+    | (((B :: lB, f:: lf), lA :: lD), d :: lLen) => aux3 lB lf lD lLen (mkOr (aux2 B (cutEvar f) lA d) t)
     | _ => True_reif (* this case should not happen *)
-    end in 0.
-   (* let lExist := 
-      aux3 lf lD' lLen False_reif in 
+    end in 
+    let lExist := 
+      aux3 lB lf lD' lLen False_reif in 
     let fix aux4 l p  l':= 
       match (l,p) with
       (* taks [A_1,...,A_n], outputs [A_p,...,A_1]*)
@@ -399,10 +452,10 @@ Definition union_direct_total (lf : list term) (lD : list (list term) ) (p : nat
       end in 
       let lAforall :=
       match lB with
-       | [] => []
-       | B :: lB => match lD with
-       | [] => []
-       | lA :: lD => B :: (aux4 lA p [])
+      | [] => []
+      | B :: lB => match lD with
+      | [] => []
+      | lA :: lD => B :: (aux4 lA p [])
       end
       end
       in 
@@ -411,18 +464,18 @@ Definition union_direct_total (lf : list term) (lD : list (list term) ) (p : nat
         | [] => t
         | A :: lA => aux5 lA (tProd (mkNamed "x") A t)
         end
-        in aux5 lAforall lExist. *)
+        in aux5 lAforall lExist.
 
 
-Definition codom_union_total (lf : list term) (lA : list (list term)) :=
+Definition codom_union_total (B : term) (lf : list term) (lA : list (list term)) :=
 (* lf is a list of function [f1;...;fn] whose return type is B, lA = [lA1 ; ...; lAn] is the list of the list of the types of the fi, e.g. lA1 is the list of argument types of lA *)
-  let fix arg_org (t : term) (lf : list term) (lA: list (list term)) :=
+  let fix arg_org (B  t : term) (lf : list term) (lA: list (list term)) :=
       match (lf , lA)  with
-      | (f1 :: tllf, lA1 :: tllA)  => (is_in_codom t f1 lA1) :: (arg_org t tllf tllA )
+      | (f1 :: tllf, lA1 :: tllA)  => (is_in_codom B t f1 lA1) :: (arg_org B t tllf tllA )
       | ([], []) => []
       | _ => [False_reif]               
       end
-  in tProd (mkNamed "x") hole  (or_nary_reif (arg_org (tRel 0)  lf lA)).
+  in tProd (mkNamed "x") B  (or_nary_reif (arg_org B (tRel 0)  lf lA)).
 
 
 Ltac revert_intro_ex_tac_aux e :=
@@ -457,18 +510,19 @@ Ltac dotac n t :=
 
 
 
-Ltac codom_union_total_tac lf lD p :=
-  let toto := fresh "H" in pose_unquote_term_hnf (union_direct_total  lf lD p) toto ; assert toto; unfold toto ;[ dotac p intro ; (let x := fresh "x" in intro x ; destruct x ; ctor_ex_case ) | ..] ; subst toto. 
+Ltac codom_union_total_tac lB lf lD p :=
+  let toto := fresh "H" in pose_unquote_term_hnf (union_direct_total lB lf lD p) toto ; assert toto; unfold toto ;[ dotac p intro ; (let x := fresh "x" in intro x ; destruct x ; ctor_ex_case ) | ..] ; subst toto. 
 
 (*** Global properties of constructors ***)
 
 
-Ltac inj_total_disj_tac lf lA   :=
-  ctors_are_inj_tac lf lA  ; pairw_disj_codom_tac lf lA ; codom_union_total_tac lf lA.
+Ltac inj_total_disj_tac B lf lA   :=
+  ctors_are_inj_tac B lf lA  ; pairw_disj_codom_tac B lf lA ; codom_union_total_tac B lf lA.
 
-Ltac inj_disj_tac lf lA ln p  :=  
-   ctors_are_inj_tac lf lA ln p ; pairw_disj_codom_tac lf lA  p
-.
+Ltac inj_disj_tac lB lf lA ln p  :=  
+  lazymatch eval hnf in lB with
+   | ?B :: ?tlB => ctors_are_inj_tac lB lf lA ln p ; pairw_disj_codom_tac B lf lA  p
+    end.
 
 
     (* list_ctor_oind is probably redundant. Remove it ? \TODO *)
@@ -492,26 +546,11 @@ Definition get_ctors_and_types_i (indu : inductive) (p :nat) (no: nat) (io : nat
 let indui := switch_inductive indu io in 
   let fix treat_ctor_oind_aux (indu : inductive) (n : nat) (j: nat)   (l : list ((ident * term) * nat  ))  :=
     match l with
-      | [] => ([] , [], [])
+      | [] => ([], [] , [], [])
       | ctor :: tll => let '((_ , typc) , nc ) := ctor in let nc' := nc + p in
-      let '((tll2,tll3),tll4) := (treat_ctor_oind_aux indu  no (j+1)  tll) in let lA_ctor :=  dom_list_f0 (debruijn0 indui no u typc) nc' in
-      ((tConstruct indui j u) :: tll2 , lA_ctor :: tll3 , nc :: tll4) 
+      let '((tll1,tll2),tll3,tll4) := (treat_ctor_oind_aux indu  no (j+1)  tll) in let (B_ctor, lA_ctor) :=  dom_list_f (debruijn0 indui no u   typc) nc' in
+      (B_ctor :: tll1,  (tConstruct indui j u)     :: tll2 , lA_ctor :: tll3 , nc :: tll4) 
     end in  treat_ctor_oind_aux indu no 0  oind.(ind_ctors).
-
-Definition get_ctors_types_dom_i (indu : inductive) (p :nat) (no: nat) (io : nat) (u : Instance.t) (oind : one_inductive_body ) :=
-      (* p  : number of parameters of indu *)
-      (* no : number of oind's *)
-      (* io  : index of oind in the mutual inductive block *)
-      (* lA : the (reified) types of the parameters *)
-let indui := switch_inductive indu io in 
-let fix treat_ctor_oind_aux (indu : inductive) (n : nat) (j: nat)   (l : list ((ident * term) * nat  ))  :=
-match l with
-| [] => ([], [] , [], [])
-| ctor :: tll => let '((_ , typc) , nc ) := ctor in let nc' := nc + p in
-let '((tll1,tll2),tll3,tll4) := (treat_ctor_oind_aux indu  no (j+1)  tll) in let (B_ctor, lA_ctor) := dom_list_f (debruijn0 indui no u   typc) nc' in
-(B_ctor :: tll1, (tConstruct indui j u) :: tll2 , lA_ctor :: tll3 , nc :: tll4) 
-end in  treat_ctor_oind_aux indu no 0  oind.(ind_ctors).
-
 
 Ltac treat_ctor_list_oind_tac_i_gen statement indu p no io u  oind  :=
   (* p : number of parameters *)
@@ -521,10 +560,12 @@ Ltac treat_ctor_list_oind_tac_i_gen statement indu p no io u  oind  :=
  in  let gct :=
   constr:(get_ctors_and_types_i indu p no io u  oind) 
  in  lazymatch eval hnf in gct with 
-  | (?lfA,?ln) => lazymatch eval hnf in lfA with
-    | (?lf,?lA) => statement lf lA ln p 
+  | (?lBfA,?ln) => lazymatch eval hnf in lBfA with
+    | (?lBf,?lA) =>  lazymatch eval cbv in lBf with
+      | (?lB,?lf) =>  statement lB lf lA ln p 
       end
-    end.
+    end
+  end.
 (* todo : supprimer le /\ True inutile dans l'injectivité *)
 
 Ltac treat_ctor_list_oind_tac_i indu p no io u oind := treat_ctor_list_oind_tac_i_gen inj_disj_tac indu p no io u oind.
