@@ -242,10 +242,144 @@ Ltac kooooo t na :=
    constr:((4,5)).
 
 
-   Inductive my_idents :=
-   | one_id {A : Type} (a : A) : my_idents.
+(* Temporary: obtaining tVar list*)   
 
-(* Temporary: obtaining tVar list*)
+Inductive my_idents :=
+  | one_id {A : Type} (a : A) : my_idents.
+
+
+From elpi Require Import elpi.
+
+Elpi Program function lp:{{
+
+pred make-palindrome i:list A, o:list A.
+
+make-palindrome L Result :-
+  std.rev L TMP,
+  std.append L TMP Result.
+
+}}.
+
+Elpi Query lp:{{
+
+  make-palindrome [1,2,3] A
+
+}}.
+
+
+(* Query assignments:
+  A = [1, 2, 3, 3, 2, 1] *)
+
+Definition m (h : 0 = 1 ) P : P 0 -> P 1 :=
+  match h as e in eq _ x return P 0 -> P x
+  with eq_refl => fun (p : P 0) => p end.
+
+Check m.
+
+
+
+(* From elpi Require Export elpi. *)
+
+Elpi Tactic clear.
+Elpi Accumulate lp:{{
+  pred not-hyp i:term, i:prop, o:term.
+  not-hyp X (decl Y _ Ty) Y :- not (occurs X Ty), not (X = Y).
+  not-hyp X (def Y _ Ty Bo) Y :- not (occurs X Ty ; occurs X Bo), not (X = Y).
+
+  solve (goal Ctx R T E [trm X]) [seal (goal Ctx R T E [])] :- name X, !, std.do! [
+    std.map-filter Ctx (not-hyp X) VisibleRev,
+    prune E1 {std.rev VisibleRev}, % preserve the order
+    std.assert-ok! (coq.typecheck E1 T) "cannot clear",
+    E = E1
+  ].
+  solve (goal _ _ _ _ Args) _ :- coq.error "clear expects 1 name, you passed:" Args.
+}}.
+Elpi Typecheck.
+Tactic Notation "eltac.clear" constr(V) := elpi clear (V).
+
+Elpi Query lp:{{
+
+coq.locate "m" (const C),
+coq.env.const C (some (fun _ _ h\ fun _ _ p\ match _ (RT h p) _)) _,
+coq.say "The return type of m is:" RT
+
+}}.
+
+
+(* Elpi Command clead_bod_id.
+Elpi Accumùulate lp:{{
+  main (T : term).
+  
+}} . *)
+
+Definition f := [1 ; 2].
+
+Elpi Query lp:{{
+
+  coq.locate "f" (const C),
+  coq.env.const C (some Bo) _
+}}.
+
+
+
+Elpi Accumulate lp:{{ std.spy-do![
+  pred stringtoident  SQ S.
+  stringtoindent SQ S :- coq.term->string Str SQ, rex.split "\"" SQ [S]]. 
+  }}.
+
+
+
+
+Elpi Tactic clear_body_list.
+Elpi Accumulate lp:{{
+
+  pred drop-body i:list argument, i:prop, o:prop.
+  drop-body ToBeCleared (def V Name Ty _Bo) (decl V Name Ty) :- std.mem ToBeCleared (trm V), !.
+  drop-body _ (decl _ _ _ as X) X.
+  drop-body _ (def _ _ _ _ as X) X.
+
+  msolve [nabla G] [nabla G1] :- pi x\ msolve [G x] [G1 x].
+  msolve [seal  (goal Ctx _ T E ToBeCleared)] [seal (goal Ctx1 _ T E1 [])] :-
+    std.map Ctx (drop-body ToBeCleared) Ctx1,
+    @ltacfail! 0 => % this failure can be catch by ltac
+      Ctx1 => % in the new context, do...
+        std.assert-ok! (coq.typecheck-ty T _) "cannot clear since the goal does not typecheck in the new context",
+    Ctx1 => std.assert-ok! (coq.typecheck E1 T) "should not happen", % E1 see all the proof variables (the pi x in the nabla case) and T is OK in Ctx1
+    E = E1. % we make progress by saying that the old goal/evar is solved by the new one (which has the same type thanks to the line above)
+
+}}.
+Elpi Typecheck.
+
+
+
+
+
+
+Tactic Notation "clear_body_list" hyp_list(l) := (* ltac1 will check that all arguments are names corresponding to existing proof variables *)
+  elpi clear_body_list ltac_term_list:(l).
+
+Elpi Command clear_body_list.
+Elpi Accumulate lp:{{
+  main [trm L] :-
+  coq.unify-eq L (app [ {{ @cons }}, X , T , L0 ]) ok,
+  % coq.ltac.call "idtac"  T, 
+  main [trm L0].  
+}}.
+Elpi Typecheck.
+
+
+
+
+
+
+Goal forall (n1 n2 : nat) (b1 b2 : bool), False.
+Proof.
+intros. 
+pose (one_id "n2") as k. 
+pose [ one_id "n1" ; one_id "b2"] as l0.
+Fail Elpi clear_body_list [ one_id "n1" ; one_id "b2"].
+pose [[ one_id "n1" ; one_id "b2"] ; [] ; [one_id "b1"]] as l. 
+Abort.
 
 (* Section  Clearbod.
 
@@ -438,7 +572,7 @@ Ltac clearbody_id_ctor ctor :=
 
   Goal False.
   pose (n3 := 0).
- Fail clearbody_id_ctor (one_id n3).
+ clearbody_id_ctor (one_id n3).
   Abort. 
 
 (***********************************)
