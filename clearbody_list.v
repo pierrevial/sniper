@@ -19,7 +19,7 @@ Elpi Accumulate lp:{{
     unwrap_ident _ _.
 
   pred unwrap_idents i: term, o: list term.
-    unwrap_idents (app [{{@cons }}, _ , X, X'])  [ID|IDS] :- unwrap_ident X ID, unwrap_idents X' IDS.
+    unwrap_idents (app [{{@cons }}, _ , X, X'])  [ID | IDS] :- unwrap_ident X ID, unwrap_idents X' IDS.
     unwrap_idents (app [{{@nil}} | _])  [].
     unwrap_idents _ [] :- coq.say "error".
     
@@ -44,10 +44,16 @@ pred clearbody_metacoq i: list term, i: goal, o: list (sealed-goal).
 }}.
 Elpi Typecheck.
 
+Lemma test2 : forall (n : nat) (b := n + 1) (r := b) (k := b * r), nat.
+Proof.
+  intros n b r k.
+Fail elpi clearbody_list_tVar n b r k.
+Abort. 
+
 Lemma test3 : forall (n : nat) (b := n + 1) (r := b) (k := b * r), nat.
 Proof.
 intros n b r k.
-elpi clearbody_list_tVar ( [ [tVar "b"; tVar "r"] ; [tVar "k" ]]).
+Fail elpi clearbody_list_tVar ( [ [tVar "b"; tVar "r"] ; [tVar "k" ]]).
 exact b.
 Show Proof.
 Qed.

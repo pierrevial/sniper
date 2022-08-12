@@ -517,7 +517,7 @@ Ltac clearbody_tVar_llist l :=
   | ?l0 :: ?tl0 => idtac "blut 6" ; clearbody_tVar_list l0 ; idtac "blut 7";  clearbody_tVar_llist tl0
 end. 
 
-
+From elpi Require Import elpi.
 Ltac gen_statement t := 
   let Helim := fresh "gen_" t in let _ := match goal with _ => 
   let indmind := fresh "indmind" in info_indu t indmind ; 
@@ -541,8 +541,8 @@ Ltac gen_statement t :=
          pose (llprojs  := res3) ; 
         let ltypes_forall := constr:(bind_def_val_in_gen llAu ln) in 
         let ggd := constr:(mkProd_rec_n "A" lP_rev (mkProd_rec_n "d" ltypes_forall (get_generation_disjunction  p t_reif N  lc  llprojs  ln))) in 
-          let gent := fresh "gen_stat" t in pose_unquote_term_hnf ggd gent  ; let N' := eval compute in (p + N) in assert (Helim : gent) by prove_by_destruct_varn N' ; unfold gent in Helim ; 
-      (* clearbody_tVar_llist llprojs; *) (* unfold gent in Helim ; *) (* subst gent ; *)  clear gent indmind llprojs (* \TODO add clearbody  *)
+          let gent := fresh "gen_stat" t in pose_unquote_term_hnf ggd gent  ; let N' := eval compute in (p + N) in assert (Helim : gent) by prove_by_destruct_varn N' ; unfold gent in Helim ; let _ := match goal with _ => (elpi clearbody_llist_tVar llprojs) end in
+      (* clearbody_tVar_llist llprojs; *) (* unfold gent in Helim ; *) (* subst gent ; *)  clear gent indmind llprojs
         end 
       end
     end
@@ -560,37 +560,6 @@ let x := gen_statement t in idtac.
 
 
 
-(* \TMP *)
-Ltac gen_blut t := 
-  let Helim := fresh "gen_" t in let _ := match goal with _ => 
-  let indmind := fresh "indmind" in info_indu t indmind ; 
-  lazymatch eval compute in indmind with
-  | (?induu,?mind) => 
-    lazymatch eval hnf in induu with
-    | (?indu, ?u) =>
-    let pparams := eval compute in (get_params_from_mind mind) in
-    lazymatch eval hnf in pparams with 
-    | (?p,?lP) =>
-    lazymatch eval hnf in pparams with
-    | (?p, ?lP) => let oind := eval compute in (hd nat_oind mind.(ind_bodies)) in
-     let gct := eval compute in  (get_ctors_and_types_i indu p 1 0 u  oind) 
-   in  lazymatch eval hnf in gct with 
-    | (?lBfA,?ln) => lazymatch eval hnf in lBfA with
-      | (?lBf,?llA) =>  lazymatch eval cbv in lBf with
-        | (?lB,?lc) =>    let llAtrunc := eval compute in (tr_map (skipn p) llA) in  let nc := eval compute in (leng ln) in 
-        let lP_rev := eval compute in (tr_rev lP) in let llAu := eval compute in (proj_return_types llAtrunc) in let t_reif := constr:(tInd indu u) in  let N := constr:(fold_left Nat.add ln 0) in
-        let res3 := 
-         declare_projs t p lP_rev t_reif indu llAu ln nc in let llprojs := fresh "llprojs" in 
-         pose (llprojs  := res3) ;  clear indmind
-end
-end
-end end end end end end in idtac.
-
-(* \TMP *)
-Goal False.
-gen_blut list.
-(* clearbody_tVar_llist llprojs. *)
-Abort.
 
 (* \TMP *)
 Ltac get_projs_st_return t := gen_statement t. 
