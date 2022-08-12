@@ -322,12 +322,32 @@ Elpi Query lp:{{
 
 
 
-Elpi Accumulate lp:{{ std.spy-do![
-  pred stringtoident  SQ S.
-  stringtoindent SQ S :- coq.term->string Str SQ, rex.split "\"" SQ [S]]. 
-  }}.
+Ltac myclearbody x := clearbody x.
 
 
+Elpi Tactic string2term.
+Elpi Accumulate lp:{{
+
+  solve (goal Ctx _ _ _ [trm Str] as G) GL :- std.spy-do! [
+    coq.term->string Str SQ,  rex.split "\"" SQ [S], % hack, there is no API to turn a Coq string into an Elpi string, other than the pretty printer
+    (std.mem Ctx (def X N _ _), coq.name->id N S), 
+  ].
+
+}}.
+Elpi Typecheck.
+
+
+Elpi Tactic string2term.
+Elpi Accumulate lp:{{
+
+  solve (goal Ctx _ _ _ [trm Str] as G) GL :- std.spy-do! [
+    coq.term->string Str SQ,  rex.split "\"" SQ [S], % hack, there is no API to turn a Coq string into an Elpi string, other than the pretty printer
+    (std.mem Ctx (def X N _ _), coq.name->id N S), % hack, the name of context entries is a pretty printing hint, here we use it (via an unsound API, documented as such)
+    coq.ltac.call "myclearbody" [trm X] G GL,
+  ].
+
+}}.
+Elpi Typecheck.
 
 
 Elpi Tactic clear_body_list.
