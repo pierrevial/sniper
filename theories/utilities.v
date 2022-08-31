@@ -450,6 +450,13 @@ lazymatch constr:(p) with
 | _ => constr_neq p z 
 end.
 
+Ltac generalize_dependent_tuple p := 
+lazymatch constr:(p) with
+| (?x, ?y) => generalize_dependent_tuple constr:(x) ; generalize_dependent_tuple constr:(y)
+| impossible_term => idtac
+| ?x => try (generalize dependent x)
+end.
+
 Ltac notHyp T  :=
 repeat match goal with
   | [H : _ |- _] => let U := type of H in constr_eq U T ; fail 2
@@ -657,6 +664,39 @@ Goal forall (A : Type) (l : list A), Datatypes.length l = 0 -> l = nil.
 let t := return_tuple_subterms_of_type_type in pose t.
 Abort.
 
+(* To reason on size of terms *)
+
+Definition list_size :=
+fun {A : Type} (size : A -> nat) =>
+fix list_size (l : list A) : nat :=
+  match l with
+  | [] => 0
+  | a :: v => S (size a + list_size v)
+  end.
+
+Definition def_size := 
+fun (size : term -> nat) (x : def term) =>
+size (dtype x) + size (dbody x).
+
+Definition mfixpoint_size := 
+fun (size : term -> nat) (l : mfixpoint term) =>
+list_size (def_size size) l.
+
+
+Fixpoint size (t : term) :=
+match t with
+| tEvar _ args => S (list_size size args)
+| tProd _ A B => S (size A + size B)
+| tLambda _ T M => S (size T + size M)
+| tLetIn _ b t0 b' => S (size b + size t0 + size b')
+| tApp u l => S (size u + (List.fold_left (fun acc x => size x + acc) l 0))
+| tCase _ p c brs => S (size p + size c + list_size
+           (fun x : nat * term =>
+            size x.2) brs)
+| tProj _ c => S (size c)
+| tFix mfix _ | tCoFix mfix _ => S (mfixpoint_size size mfix)
+| _ => 1
+end.
 
 (******)
 (** Temporay: should rather be written in OCaml *)
