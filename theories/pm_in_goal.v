@@ -242,7 +242,7 @@ Elpi Query lp:{{
 
 }}.
 
-Elpi Tactic tryftp.  
+Elpi Tactic blutas.  
 Elpi Accumulate lp:{{  %  pred blut4 i : term.  % \Q ???? nécessaire de changer le 'goal' ? chercher G et GL
 % probablement ---> c'est les extra arguments
 
@@ -258,8 +258,8 @@ Elpi Accumulate lp:{{  %  pred blut4 i : term.  % \Q ???? nécessaire de changer
   pred funtoprod i : term, i : term, o : term.   
     funtoprod (fun Na Ty Fu1) Te (prod Na Ty Fu2) :-   coq.say "entree funtoprod 1",
     pi x\ decl x Na Ty => funtoprod (Fu1 x) Te (Fu2 x).
-    funtoprod Fu Bo Re :-  (app [{{ @eq }}, _ , Fu , Bo]) = Re.
-     % coq.unify-eq (app [{{ @eq }}, _ , Fu , Bo]) Re ok ,  coq.say "entree funtoprod 2".
+    funtoprod Fu Bo Re :-  % (app [{{ @eq }}, _ , Fu , Bo]) = Re.
+      coq.unify-eq (app [{{ @eq }}, _ , Fu , Bo]) Re ok .%  coq.say "entree funtoprod 2".
     % funtoprod _ _ _ :- coq.say "Error funtoprod".
 
 
@@ -273,8 +273,13 @@ Elpi Accumulate lp:{{  %  pred blut4 i : term.  % \Q ???? nécessaire de changer
 % Each case is of the form (fun _ Ty1 (c1 \ fun _ Ty2 (c2 \... (fun _ Tyn (cn\ Bo ))... )))
 % \TODO vérifier et corriger
 
+
+
+pred blut0 i : term, o : term.
+    blut0 (match Te Ty LCases) Te.
+
   pred blut1 i : term, o : list term.
-    blut1 (match Te Ty LCases) LCases :- coq.say "blut1 a été appelé".
+    blut1 (match Te Ty LCases) LCases.
     % blut1 _ _ : coq.say "Error blut1".  % \! rq: Typecheck marche pas si deux wildcards
        % \! et error FULLSTOP si blut1 _ []
  
@@ -293,16 +298,15 @@ Elpi Accumulate lp:{{  %  pred blut4 i : term.  % \Q ???? nécessaire de changer
     isconjj Lo :- ( coq.unify-eq (app [ {{@and}} , L , L]) Lo Kk, coq.say "c'est une conjonction" ; coq.say "pas une conj").
 
 
-  solve (goal _ _ _ _ [trm L] as G) GL :-  
-  %    blut5 T To. 
-  % coq.say "entree tactique" ,
-  %  isconjj L. 
-   funtoprod L ( {{1}}) Re,  coq.say Re, %, coq.ltac.call "assert" [trm Re] G GL,   
-    coq.say "koo". % blut1 L _. % blut1 L GL.
+  solve (goal _ _ _ _ [trm L] as G) GL :-   
+ %  funtoprod L ( {{1}}) Re,  coq.say Re %, coq.ltac.call "assert" [trm Re] G GL,
+    blut0 L Te, 
+    blut1 L [L0 | LCases],  funtoprod L0 Te Re, coq.ltac.call "myassert" [trm Re] G GL . % , coq.say Re,   
+  %  coq.say "koo". % blut1 L _. % blut1 L GL.
 }}.
 Elpi Typecheck.
 
-Tactic Notation "tryftp" constr(l) := elpi tryftp (l).
+Tactic Notation "blutas" constr(l) := elpi blutas (l).
 
 Elpi Query lp:{{  coq.say {{ (fun (a b : nat) => 0)}}  }}.
 
@@ -311,12 +315,22 @@ Elpi Query lp:{{  coq.say {{ (fun (a b : nat) => 0)}}  }}.
 Goal forall (x y : nat) (b1 b2 : bool), True.
 Proof. intros. 
 Elpi Query lp:{{coq.say "kikooo".}}.
-tryftp 0.  
-tryftp (fun (a : nat) => a ). 
-tryftp (fun (a b : nat) => 0) .
-tryftp (True /\ True).
-tryftp 2 . 
-tryftp (fun (a b : nat) => 0) .
+blutas (match (x + y) with 
+| 0 => true 
+| S k => false
+end).
+let kik := constr:((match (x + y) with 
+| 0 => true 
+| S k => false
+end))  in blutas kik.
+blutas (match 1 +2 with 
+)
+blutas 0.  
+blutas (fun (a : nat) => a ). 
+blutas (fun (a b : nat) => 0) .
+blutas (True /\ True).
+blutas 2 . 
+blutas (fun (a b : nat) => 0) .
 
 let kik := eval hnf in (fun (a b : nat) => 0)  in blublut kik.
 
