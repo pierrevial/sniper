@@ -94,6 +94,7 @@ Elpi Typecheck. *)
 
 
 
+
 (* Elpi Tactic rettac. *)
 (* Elpi Accumulate lp:{{
   solve (goal _ _ _ _ [trm L] as G) GL :-   
@@ -144,7 +145,37 @@ Fail elpi saveterm ("fjk") (2).
 Abort.
 
 
+Goal forall (n : nat) (k : nat),
+ n =  S k -> ((match n with
+ | 0 => true
+ | S k0 => false 
+ end) = false)
+.
+intro n. intro k. intro H. inversion H. reflexivity.
+Qed.
 
+
+Goal forall (A : Type) (l : list A) (def : A) (a : A) (l0 : list A),
+ l =  a :: l0 -> ((match l with
+ | [] => def 
+ | a :: l0 => a 
+ end) = a).
+intro A. intro l. intro def. 
+intro a. intro l0. intro H.
+inversion H. reflexivity.
+Qed.
+
+(* blut_tac H k proves H when H has the form
+   forall (x1 : A1) ... (xk : Ak), e = Ci x1 .... xk 
+   -> (match e with
+        ....
+        | Ci x1' .... Ci xk' => fi  
+        ....
+        end ) = fi
+  Tactic blut_tac is useful to prove the output of \TODO???   
+*)
+Ltac blut_tac H k := (intros until k ; let HProd := fresh "H" in
+intro HProd ; inversion HProd ; reflexivity).
 
 
 (* 
@@ -198,6 +229,7 @@ elpi useint 2 2 "3" (1 =0).
 Abort.
 
 
+
 Elpi Tactic useint2.
 Elpi Accumulate lp:{{
   solve (goal _ _ _ _ [int N,  Args] as G) GL :- 
@@ -226,6 +258,62 @@ poseas 3 kik.
 let na := fresh kik in idtac na.
 Abort.
 
+
+
+Elpi Query lp:{{
+  {{ nat }} = global (indt I). % indc donne une erreur plus haut
+
+
+}}.
+
+Elpi Tactic binga.
+Elpi Accumulate lp:{{
+  pred bingo i : int.
+    bingo (S N) :- coq.say "bingo rec",
+    solve (goal _ _ _ _ _ as G) GL, coq.ltac.call "myassert" [trm True] G GL,
+    bingo N.
+
+  solve (goal  _ _ _ _  _ as GA) GB :- coq.say "entree binga", bingo 3.
+}}.
+Elpi Typecheck.
+
+Goal False.
+Fail elpi binga 3.
+Abort.
+
+
+
+Elpi Tactic printos.
+Elpi Accumulate lp:{{
+  pred scos i : term, i : list term, i : term, i : term, i : term, o : term.
+     scos (fun X Ty F) L M E C  (prod X Ty Re) :- !, pi x\ decl x _ Ty => 
+          scos (F x) [x | L ] M E C  (Re x).
+      scos F L M E C (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ). 
+      
+    %scos F L M E C F . 
+
+
+  solve (goal _ _ _ _ [trm M, int N] as G) GL :- coq.say M,
+  M  = (match E _ LCases), 
+  coq.say "M is" M,
+  coq.typecheck E Ty ok,
+  (global (indt I)  = Ty ; app [global (indt I) | _ ] = Ty),  
+  coq.say "\n\nI is" I, 
+  coq.env.indt I _ _ P _ Ks _, coq.say "\n\nKs is" Ks,
+  std.map Ks (x\ y\ y = global (indc x)) LCtors, 
+  coq.say "\n\nLCtors is" LCtors,
+  std.nth N LCtors C, 
+  std.nth N LCases F, coq.say "kikoo",
+  coq.mk-n-holes P H, 
+  coq.say "\n\nTy is" Ty "\n\nF is " F  "\n\nM is" M  "\n\nE is" E "\n\nC is" C,
+  scos F [] M E (app [C | H]) Re, coq.say "Re est" Re.
+ % coq.ltac.call "myassert" [trm Re] G GL. 
+}}.
+Elpi Typecheck.
+
+
+Tactic Notation "printos" constr(l) integer(n) := elpi printos ltac_term:(l) ltac_int:(n).
+
 Elpi Tactic mytac.
 Elpi Accumulate lp:{{
   pred essai i : term, i : list term, i : term, i : term, i : term, o : term.
@@ -236,26 +324,69 @@ Elpi Accumulate lp:{{
     %essai F L M E C F . 
 
 
-% LCa : list of cases
-% Ks : list of constructors
+% LCases : list of cases
+% LCtors : list of constructors
 
-  solve (goal _ _ _ _ [list trm LCa, trm M, trm E, trm LCo] as G) GL :- coq.say M,
-  M  = (match E _ LCases), 
-  % coq.ltac.call "poseas" [trm M, str]
-  coq.typecheck E Ty ok,
-  (global (indt I)  = Ty ; app [global (indt I) | _ ] = Ty),  
-  coq.env.indt I _ _ P TyI Ks KTs,
-  %N is std.length Ks, % \Q is there a more efficient way to get N? 
-  std.map Ks (x\ y\ y = global (indc x)) LCtors, 
-  std.nth N LCtors C, 
-  std.nth N LCases F, coq.say "kikoo",
-  coq.mk-n-holes P H, 
-  coq.say "Ty is" Ty "\n\nF is " F  "\n\nM is" M  "\n\nE is" E "\n\nC is" C,
-  essai F [] M E (app [C | H]) Re, coq.say "Re est" Re,
-  coq.ltac.call "myassert" [trm Re] G GL. 
+
+% \TODO :l'argument devrait être Ks, pas LCtors (pour éviter de relire la liste Ks)
+% [list trm LCases, trm M, trm E, trm Ty, trm I, int P, trm LCtors, list trm H] 
+%% PROBLEME : I est dans doute un 'inductive' de Elpi
+
+% on doit unsealer GA
+  pred blutoz i : list term, i : term, i: term, i: term, i: int, i : list constructor, i : list term.
+  blutoz LCases M E Ty P Ks H 
+   :- !, %coq.say "branche 1", 
+   %coq.typecheck E Ty ok,
+   %(global (indt I)  = Ty ; app [global (indt I) | _ ] = Ty),  
+   %coq.env.indt I _ _ P _ Ks _,
+  %%%%% N is std.length Ks, % \Q is there a more efficient way to get N? 
+  %%%%% std.map Ks (x\ y\ y = global (indc x)) LCtors, 
+  %%%% coq.mk-n-holes P H, 
+  LCases = [ F | LCa0 ], Ks = [ K | Ks0], C = global (indc K),
+  essai F [] M E (app [C | H]) Re,
+% coq.ltac.call "myassert" [trm Re] _ [GA | GL], GA = seal GAu, coq.ltac.call "admit" [] GAu _. 
+  blutoz [] M E Ty P Ks H 
+   :- !, coq.say "branche 0". 
+  %% PROBLEME, c'est à GL, pas à GA qu'on veut appliquer l'appel récursif
+   %% PROBLEME : mélange de prédicat et de tactique
+
+
+ % solve (goal _ _ _ _ [trm M, int N] as G) GL :- coq.say M,
+ % M  = (match E _ LCases), 
+  %%%% coq.ltac.call "poseas" [trm M, str]
+  %coq.typecheck E Ty ok,
+  %(global (indt I)  = Ty ; app [global (indt I) | _ ] = Ty),  
+  %coq.env.indt I _ _ P _ Ks _,
+  %%%%% N is std.length Ks, % \Q is there a more efficient way to get N? 
+  %%%%% std.map Ks (x\ y\ y = global (indc x)) LCtors, 
+  %coq.mk-n-holes P H, 
+  %blutoz.
 }}.
 Elpi Typecheck.
 
+Goal False.
+  printos  (match 2 with 
+  | 0 => true 
+  | S k => false
+  end) 1.
+Abort.
+
+Elpi Query lp:{{ coq.say "KIKOOOOO". }}.
+
+Elpi Query lp:{{global (indt I)  = {{ nat }} , 
+coq.mk-n-holes 1 H,
+coq.env.indt I _ _ P _ Ks _  ,
+  blutoz % {{L M E Ty P Ks H. }} .
+ [{{0}} , {{S}}]
+{{(match 2 with 
+  | 0 => true 
+  | S k => false
+  end) }} {{2}}  {{nat}}
+   0 Ks H.
+}}.
+
+(* pred blutoz i : list term, i : term, i: term, i: inductive, i: int, i :term, i : list constructor, i : list term.
+  blutoz LCases M E Ty I P Ks H  *)
 
 
 (*     
@@ -269,6 +400,7 @@ Elpi Query lp:{{
   essai {{fun (a : nat) => true }}  [] {{false }} {{0}} {{S}} P, coq.say P.
  % essai {{fun (a : nat) ( b : bool)=> a }} [] {{true}} {{0}} {{S}} P.
 }}. *)
+
 
 Elpi Query lp:{{
   essai (fun _ X0 c0\ fun _ (X1 c0) c1\ {{ true}}) []  
