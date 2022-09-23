@@ -20,6 +20,8 @@ Goal False.
 assertna kik 2. 
 Abort.
 
+
+
 Elpi Command kikooo.
 
 
@@ -266,6 +268,31 @@ Elpi Query lp:{{
 
 }}.
 
+Elpi Tactic looptry.  
+Elpi Accumulate lp:{{
+   %type T open-tactic.
+  %T = x\ y\ coq.ltac.call "myassert" [trm True] x y.
+  pred tacoss i : sealed-goal,  i : list sealed-goal.
+    tacoss G [G].
+
+  
+
+  pred tack i : tactic, i : sealed-goal, o : list sealed-goal.   
+    % tack T G G :- thenl [T , T , T] G [G]. 
+    tack T G [G] :- thenl [T , T , T] G [ G, G , G]. 
+  }}.
+Elpi Typecheck.
+
+(* 
+Elpi Query lp:{{ 
+ % T = open (x\ y\ coq.ltac.call "myassert" [trm True] x y),
+ % coq.ltac.thenl T SG L.
+%  thenl [T] SG L. 
+%  thenl T SG SG,
+%  tack  T G L .
+}}.*)
+
+
 Elpi Tactic binga.
 Elpi Accumulate lp:{{
   pred bingo i : int.
@@ -273,13 +300,28 @@ Elpi Accumulate lp:{{
     solve (goal _ _ _ _ _ as G) GL, coq.ltac.call "myassert" [trm True] G GL,
     bingo N.
 
-  solve (goal  _ _ _ _  _ as GA) GB :- coq.say "entree binga", bingo 3.
+  solve (goal  _ _ _ _ _ as GA) GB :- coq.say "entree binga", bingo 3.
 }}.
 Elpi Typecheck.
 
 Goal False.
 Fail elpi binga 3.
 Abort.
+
+Elpi Tactic assertacos.
+Elpi Accumulate lp:{{
+  pred gloub i : term.
+    gloub T :- solve (goal  _ _ _ _ _ as G) GL :-
+    coq.ltac.call "assert"  [trm T] G GL. 
+
+  solve (goal _ _ _ _ [trm T]) _ :- gloub T.
+}}.
+Elpi Typecheck.
+
+Goal False.
+Fail elpi assertacos (True).
+Abort.
+
 
 
 
@@ -316,10 +358,26 @@ Tactic Notation "printos" constr(l) integer(n) := elpi printos ltac_term:(l) lta
 
 Elpi Tactic mytac.
 Elpi Accumulate lp:{{
+
+  pred dotacntimes i : tactic, i : int, i : sealed-goal, o : list sealed-goal.
+    dotacntimes T 0 G [].  % [] ou [G]
+    dotacntimes T (S N) G [] :-  T G [ G0 ], dotacntimes T N G0 [].
+   % dotacntimes T (S N) LG :-  T G [ G0 | LG0 ],
+     % dotacntimes T N G0 LGN,  std.append LGN LG0 LG.
+    
+      % vérifier si l'ordre LGN ++ LG0 est bon
+      % dans la pratique, LG0 devrait probablement être systématiquement vide
+
+
+  % essai L M E C (fun (x1 : A1) ... (xn : An ) => f)
+  %    outputs 
+  % forall  (x1 : A1) ... (xn : An ), E = C [x1 ; ... ; xn L] -> M = f
+  % where the x1 ... xn may occur in the expression f
+  % In practice, when essai is called, M is a match on the expression E and C is a constructor of the type of E and L = [] (L is an accumulator)     
   pred essai i : term, i : list term, i : term, i : term, i : term, o : term.
-     essai (fun X Ty F) L M E C  (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", coq.say " M is" M,
-          essai (F x) [x | L ] M E C  (Re x).
-      essai F L M E C (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ) :- 
+     essai  L M E C (fun X Ty F) (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", coq.say " M is" M,
+          essai  [x | L ] M E C (F x) (Re x).
+      essai L M E C F (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ) :- 
       coq.say "for essai, M is" M, coq.say "branche 2".
     %essai F L M E C F . 
 
@@ -332,36 +390,48 @@ Elpi Accumulate lp:{{
 % [list trm LCases, trm M, trm E, trm Ty, trm I, int P, trm LCtors, list trm H] 
 %% PROBLEME : I est dans doute un 'inductive' de Elpi
 
+
+  % readmatch M E Ty LCa P Ks H has for only input M, which is supposed to be a term of the form 
+  % match E with 
+  % ...
+  % | C_i x_1 .... x_n => f_i
+  %  ... end
+  % Then E is the matched expression, whose type is Ty
+  % LCa is the list of cases of [match]
+  % P is the number of (type) parameters of Ty %%% \Q is P useful?
+  % Ls is the list of the constructors of Ty (elpi type [constructor]) 
+  % H is a list of P holes
+
+  pred readmatch i : term, o : term, o : term, o : list term, o : int, o : list inductive, o : list term.
+    readmatch M E Ty LCa P Ks H  :-
+    M  = (match E _ LCa)
+    coq.typecheck E Ty ok,
+    (global (indt I)  = Ty ; app [global (indt I) | _ ] = Ty),
+    coq.env.indt I _ _ P _ Ks _,
+    coq.mk-n-holes P H.
+
 % on doit unsealer GA
-  pred blutoz i : list term, i : term, i: term, i: term, i: int, i : list constructor, i : list term.
-  blutoz LCases M E Ty P Ks H 
-   :- !, %coq.say "branche 1", 
-   %coq.typecheck E Ty ok,
-   %(global (indt I)  = Ty ; app [global (indt I) | _ ] = Ty),  
-   %coq.env.indt I _ _ P _ Ks _,
-  %%%%% N is std.length Ks, % \Q is there a more efficient way to get N? 
-  %%%%% std.map Ks (x\ y\ y = global (indc x)) LCtors, 
-  %%%% coq.mk-n-holes P H, 
-  LCases = [ F | LCa0 ], Ks = [ K | Ks0], C = global (indc K),
-  essai F [] M E (app [C | H]) Re,
-% coq.ltac.call "myassert" [trm Re] _ [GA | GL], GA = seal GAu, coq.ltac.call "admit" [] GAu _. 
-  blutoz [] M E Ty P Ks H 
-   :- !, coq.say "branche 0". 
-  %% PROBLEME, c'est à GL, pas à GA qu'on veut appliquer l'appel récursif
-   %% PROBLEME : mélange de prédicat et de tactique
+% on doit outputer la liste suivante et faire un appel récursif
+ % assblut doit être currifiable en tactique !!!!!
+  pred assblut i : term, i : term,   i : list term, i : list constructor, i : list term, i : goal, o : list sealed-goal.
+    assblut  M E H [] [] G [seal G].
+    assblut  M E H [K | TK] [F | LCa ] :- 
+      app [global (indc K), H] = C,
 
+  
+  solve (goal _ _ _ _ [trm M] as G) GL :- 
+    readmatch M E Ty LCa P Ks H,  %%% Besoin de Ty ? De P ?
 
- % solve (goal _ _ _ _ [trm M, int N] as G) GL :- coq.say M,
- % M  = (match E _ LCases), 
-  %%%% coq.ltac.call "poseas" [trm M, str]
-  %coq.typecheck E Ty ok,
-  %(global (indt I)  = Ty ; app [global (indt I) | _ ] = Ty),  
-  %coq.env.indt I _ _ P _ Ks _,
-  %%%%% N is std.length Ks, % \Q is there a more efficient way to get N? 
-  %%%%% std.map Ks (x\ y\ y = global (indc x)) LCtors, 
-  %coq.mk-n-holes P H, 
-  %blutoz.
-}}.
+% loop supposée
+    LCa = [F | TLCa ], Ks = [K | TK ], 
+    app [global (indc K), H] = C,
+    essai [] M E C F P,
+    coq.ltac.call "myassert" [trm P] GA [GA'], 
+    , coq.ltac.call "blut_tac" GA []
+ %%% fin de loop
+    % \Q : qu'est-ce que le dernier arg de call ?
+    % \Q comment nommer les hypos ?
+}}.  
 Elpi Typecheck.
 
 Goal False.
