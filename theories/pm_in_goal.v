@@ -12,6 +12,10 @@ Require Import SMTCoq.SMTCoq.
 
 From elpi Require Import elpi.
 
+
+
+
+
 Ltac asserteq x := let blut := fresh in assert (blut := x).
 Ltac myassert x := assert x.
 Ltac assertna na x := assert ( na := x).
@@ -103,6 +107,7 @@ Elpi Typecheck. *)
       coq.say "how do I get an lpi tactic returning something?".
 }}. *)
 
+
 Elpi Accumulate lp:{{
 
 % Q: a-t-on besoin de stocker les types ou sont ils inférables ?
@@ -132,6 +137,72 @@ Elpi Accumulate lp:{{
   
 }}.
     
+
+Elpi Tactic dumref.
+Elpi Accumulate lp:{{
+ %  solve _ [] :- coq.ltac.call "reflexivity" [] _ _.
+ % na marche pas
+ % solve _ [] :- coq.ltac.call "reflexivity" [] G [].
+ %%%% ne marche pas 
+ % solve G [] :- coq.ltac.call "reflexivity" [] _ [].
+ %%%% ne marche pas 
+ solve G [] :- coq.ltac.call "reflexivity" [] G [].
+% solve (goal _ _ _ _ _ as G) [] :- coq.ltac.call "reflexivity" [] G [].
+}}.
+Elpi Typecheck.
+
+
+Tactic Notation "dumref" := elpi dumref.
+
+
+Elpi Tactic dumkik.
+Elpi Accumulate lp:{{
+ % solve G [G0] :- coq.say "hello world".
+ %%% fails   \Q ask on zulip
+ solve _ _ :- coq.say "hello world".
+}}.
+Elpi Typecheck.
+
+
+Tactic Notation "dumkik" := elpi dumkik.
+
+Lemma foo:  2 = 2 .
+Proof.
+dumkik.  
+dumref.
+Qed.
+Reset foo.
+
+
+Lemma foo: 2 = 2 /\ True.
+Proof.
+split.
+dumref. (* marche, donc on ne binde que la liste des subgoals créés par la tactique *)
+trivial.
+Qed.
+Reset foo.
+
+(* assert A then proves A by reflexivity *)
+Elpi Tactic dumassref.
+Elpi Accumulate lp:{{ 
+solve (goal _ _ _ _ [trm A] as G) LSG :- coq.ltac.call "myassert" [trm A] G [SG0 | LSG], % !!!!
+ SG0 = seal G0, 
+  coq.ltac.call "reflexivity" [] G0 []. 
+ %solve (goal _ _ _ _ [trm A] as G) [] :- coq.ltac.call "myassert" [trm A] G [SG0], %%% ne marche pas !!!
+ % SG0 = seal G0, 
+ % coq.ltac.call "reflexivity" [] G0 [].
+% solve (goal _ _ _ _ _ as G) [] :- coq.ltac.call "reflexivity" [] G [].
+}}.
+Elpi Typecheck.
+
+
+Tactic Notation "dumassref" constr(t) := elpi dumassref ltac_term:(t).
+
+Goal False.
+dumassref (1 = 1).
+Abort.
+
+
 Elpi Tactic saveterm. (* \TMP: remove when it works *)
 Elpi Accumulate lp:{{
     solve (goal _ _ _ _ [str Na, trm M] as G) GL :- coq.say M,
@@ -167,7 +238,7 @@ intro a. intro l0. intro H.
 inversion H. reflexivity.
 Qed.
 
-(* blut_tac H k proves H when H has the form
+(* blut_tac k proves H when H has the form
    forall (x1 : A1) ... (xk : Ak), e = Ci x1 .... xk 
    -> (match e with
         ....
@@ -176,14 +247,32 @@ Qed.
         end ) = fi
   Tactic blut_tac is useful to prove the output of \TODO???   
 *)
-Ltac blut_tac H k := (intros until k ; let HProd := fresh "H" in
+
+
+Ltac pintros_inv p := (do p intro; let HProd := fresh "H" in
 intro HProd ; inversion HProd ; reflexivity).
+
+Tactic Notation "pintros_inv" integer(k) := pintros_inv (k).
+
+
+Ltac intro_inv p := (let HProd := fresh "H" in
+intro HProd ; inversion HProd ; reflexivity).
+
+
+Lemma foo:  forall (A : Type) (l : list A) (def : A) (a : A) (l0 : list A),
+ l =  a :: l0 -> ((match l with
+ | [] => def 
+ | a :: l0 => a 
+ end) = a).
+Proof. 
+  do 4 intro.  pintros_inv 1.  
+Qed. Reset foo.
 
 
 (* 
 Elpi Query lp:{{
 F = fun _ X0 c0\ fun _ (X1 c0) c1\ {{ true}},
-M = match   (app
+M = match   (apxp
     [{{ @cons }}, {{nat}}, 
    app [{{S}}, {{0}}], 
      app
@@ -415,20 +504,23 @@ Elpi Accumulate lp:{{
  % assblut doit être currifiable en tactique !!!!!
   pred assblut i : term, i : term,   i : list term, i : list constructor, i : list term, i : goal, o : list sealed-goal.
     assblut  M E H [] [] G [seal G].
-    assblut  M E H [K | TK] [F | LCa ] :- 
-      app [global (indc K), H] = C,
-
+    assblut  M E H [K | TK] [F | LCa ] G GL :- 
+      app [global (indc K), H] = C, essai [] M E C F Pro, 
+      coq.ltac.call "myassert" [trm Pro] G [SG0 ], % remplacer LG0 par LG ?  
+      SG0 = seal G0, 
+      coq.ltac.call "pintros_inv" [] G0 [], assblut M E H [TK ] LCA
   
   solve (goal _ _ _ _ [trm M] as G) GL :- 
     readmatch M E Ty LCa P Ks H,  %%% Besoin de Ty ? De P ?
 
-% loop supposée
-    LCa = [F | TLCa ], Ks = [K | TK ], 
-    app [global (indc K), H] = C,
-    essai [] M E C F P,
-    coq.ltac.call "myassert" [trm P] GA [GA'], 
-    , coq.ltac.call "blut_tac" GA []
- %%% fin de loop
+
+%%%% loop supposée
+%    LCa = [F | TLCa ], Ks = [K | TK ], 
+%    app [global (indc K), H] = C,
+%    essai [] M E C F P,
+%    coq.ltac.call "myassert" [trm P] GA [GA'], 
+%    , coq.ltac.call "blut_tac" GA [].
+%%% fin de loop
     % \Q : qu'est-ce que le dernier arg de call ?
     % \Q comment nommer les hypos ?
 }}.  
