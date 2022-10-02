@@ -255,8 +255,10 @@ intro HProd ; inversion HProd ; reflexivity).
 Tactic Notation "pintros_inv" integer(k) := pintros_inv (k).
 
 
-Ltac intro_inv p := (let HProd := fresh "H" in
+Ltac intro_inv  := (let HProd := fresh "H" in
 intro HProd ; inversion HProd ; reflexivity).
+
+
 
 
 Lemma foo:  forall (A : Type) (l : list A) (def : A) (a : A) (l0 : list A),
@@ -291,7 +293,7 @@ M = match   (apxp
 %   app [{{@nil}}, {{nat}}]]] ,
 %C = 
 %   {{@cons}} .
-%  essai F [] M E C P.
+%  fun_to_prod F [] M E C P.
 %}}. *)
 
 Elpi Tactic print_args.
@@ -411,6 +413,19 @@ Goal False.
 Fail elpi assertacos (True).
 Abort.
 
+(* tentative d'avoir une antiquotation facile*)
+Elpi Tactic antiq.
+Elpi Accumulate lp:{{
+  solve G GL :- coq.ltac.call "myassert" [ trm (
+ %   prod X0 
+ app [{{@eq}}, X1, app [{{S}}, app [{{S}}, {{0}}]], app [app [{{0}}]]]  
+ %   (c0\  (app  [{{@eq}}, X2,    match
+ %   (app [{{S}}, app [{{S}}, {{O}}]]) 
+ %  (fun X5 ({{nat}}) c1 \ (X3 c1)) 
+ %   [{{true}}, (fun X6 X4 (c1 \ {{false}}))],   {{true}}] ))
+   )] G GL  .
+}}.
+Elpi Typecheck.
 
 
 
@@ -448,36 +463,21 @@ Tactic Notation "printos" constr(l) integer(n) := elpi printos ltac_term:(l) lta
 Elpi Tactic mytac.
 Elpi Accumulate lp:{{
 
-  pred dotacntimes i : tactic, i : int, i : sealed-goal, o : list sealed-goal.
-    dotacntimes T 0 G [].  % [] ou [G]
-    dotacntimes T (S N) G [] :-  T G [ G0 ], dotacntimes T N G0 [].
-   % dotacntimes T (S N) LG :-  T G [ G0 | LG0 ],
-     % dotacntimes T N G0 LGN,  std.append LGN LG0 LG.
+  
     
-      % vérifier si l'ordre LGN ++ LG0 est bon
-      % dans la pratique, LG0 devrait probablement être systématiquement vide
 
-
-  % essai L M E C (fun (x1 : A1) ... (xn : An ) => f)
+  % fun_to_prod L M E C (fun (x1 : A1) ... (xn : An ) => f)
   %    outputs 
   % forall  (x1 : A1) ... (xn : An ), E = C [x1 ; ... ; xn L] -> M = f
   % where the x1 ... xn may occur in the expression f
-  % In practice, when essai is called, M is a match on the expression E and C is a constructor of the type of E and L = [] (L is an accumulator)     
-  pred essai i : term, i : list term, i : term, i : term, i : term, o : term.
-     essai  L M E C (fun X Ty F) (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", coq.say " M is" M,
-          essai  [x | L ] M E C (F x) (Re x).
-      essai L M E C F (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ) :- 
-      coq.say "for essai, M is" M, coq.say "branche 2".
-    %essai F L M E C F . 
+  % In practice, when fun_to_prod is called, M is a match on the expression E and C is a constructor of the type of E and L = [] (L is an accumulator)     
+  pred fun_to_prod i : list term, i : term, i : term, i : term, i : term, o : term.
+     fun_to_prod L M E C (fun X Ty F) (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1 essai", 
+          fun_to_prod [x | L ] M E C (F x) (Re x).
+      fun_to_prod L M E C F (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ) :- coq.say "fin essai".
+    %fun_to_prod F L M E C F . 
 
 
-% LCases : list of cases
-% LCtors : list of constructors
-
-
-% \TODO :l'argument devrait être Ks, pas LCtors (pour éviter de relire la liste Ks)
-% [list trm LCases, trm M, trm E, trm Ty, trm I, int P, trm LCtors, list trm H] 
-%% PROBLEME : I est dans doute un 'inductive' de Elpi
 
 
   % readmatch M E Ty LCa P Ks H has for only input M, which is supposed to be a term of the form 
@@ -491,33 +491,37 @@ Elpi Accumulate lp:{{
   % Ls is the list of the constructors of Ty (elpi type [constructor]) 
   % H is a list of P holes
 
-  pred readmatch i : term, o : term, o : term, o : list term, o : int, o : list inductive, o : list term.
+  pred readmatch i : term, o : term, o : term, o : list term, o : int, o : list constructor, o : list term.
     readmatch M E Ty LCa P Ks H  :-
-    M  = (match E _ LCa)
+    M  = (match E _ LCa),
     coq.typecheck E Ty ok,
     (global (indt I)  = Ty ; app [global (indt I) | _ ] = Ty),
-    coq.env.indt I _ _ P _ Ks _,
+    coq.env.indt I _ _ P _ Ks  _,
     coq.mk-n-holes P H.
 
-% on doit unsealer GA
-% on doit outputer la liste suivante et faire un appel récursif
- % assblut doit être currifiable en tactique !!!!!
-  pred assblut i : term, i : term,   i : list term, i : list constructor, i : list term, i : goal, o : list sealed-goal.
-    assblut  M E H [] [] G [seal G].
-    assblut  M E H [K | TK] [F | LCa ] G GL :- 
-      app [global (indc K), H] = C, essai [] M E C F Pro, 
-      coq.ltac.call "myassert" [trm Pro] G [SG0 ], % remplacer LG0 par LG ?  
-      SG0 = seal G0, 
-      coq.ltac.call "pintros_inv" [] G0 [], assblut M E H [TK ] LCA
+% SA should be unseald
+  pred assblut i : term, i : term, i : list term, i : list constructor, i : list term, i : goal, o : list sealed-goal.
+    assblut  M E H [] [] G [seal G] :- coq.say "fin assblut". % should we just have _ instead of [seal G]?
+    assblut  M E H [K | TK] [F | TLCa ] G GL :-  % GL remplaçable par [seal G] ? 
+      app [global (indc K) | H] = C, coq.say "assblut 2", fun_to_prod [] M E C F Pro, 
+      coq.say "apres essai, Pro is" Pro,
+      coq.typecheck Pro _ ok, % crucial when one wants to discard evars in Pro
+      coq.say "assblut 3",
+      coq.ltac.call "myassert" [trm Pro] G [seal GPro    | LSG ], %seal G],
+      coq.say "apres myassert",    
+      coq.ltac.call "intro_inv" [] GPro [], 
+      coq.say "avant l'appel rec de assblut",
+      assblut M E H TK TLCa G GL. % is it GL here?
   
   solve (goal _ _ _ _ [trm M] as G) GL :- 
-    readmatch M E Ty LCa P Ks H,  %%% Besoin de Ty ? De P ?
+    coq.say "solve 1", readmatch M E Ty LCa P Ks H, coq.say "solve 2", 
+    assblut M E H Ks LCa G GL.
 
 
 %%%% loop supposée
 %    LCa = [F | TLCa ], Ks = [K | TK ], 
 %    app [global (indc K), H] = C,
-%    essai [] M E C F P,
+%    fun_to_prod [] M E C F P,
 %    coq.ltac.call "myassert" [trm P] GA [GA'], 
 %    , coq.ltac.call "blut_tac" GA [].
 %%% fin de loop
@@ -525,6 +529,24 @@ Elpi Accumulate lp:{{
     % \Q comment nommer les hypos ?
 }}.  
 Elpi Typecheck.
+
+
+
+Goal False.
+elpi antiq. 
+Abort.
+
+Goal nat.
+Elpi Query lp:{{ coq.say "KIKOOOOO". }}.
+
+
+
+  elpi mytac  (match 2 with 
+  | 0 => true 
+  | S k => false
+  end).
+  exact 0.
+Abort.
 
 Goal False.
   printos  (match 2 with 
@@ -559,13 +581,13 @@ Elpi Query lp:{{
  % pi x \decl x _ Ty => whd1 (F x) T. %coq.say T.
   % whd1 {{ (fun (a b : nat) => a ) (2+ 3)}} T, 
   %coq.mk-n-holes 2 L, 
-  essai {{fun (a : nat) => true }}  [] {{false }} {{0}} {{S}} P, coq.say P.
- % essai {{fun (a : nat) ( b : bool)=> a }} [] {{true}} {{0}} {{S}} P.
+  fun_to_prod {{fun (a : nat) => true }}  [] {{false }} {{0}} {{S}} P, coq.say P.
+ % fun_to_prod {{fun (a : nat) ( b : bool)=> a }} [] {{true}} {{0}} {{S}} P.
 }}. *)
 
 
 Elpi Query lp:{{
-  essai (fun _ X0 c0\ fun _ (X1 c0) c1\ {{ true}}) []  
+  fun_to_prod (fun _ X0 c0\ fun _ (X1 c0) c1\ {{ true}}) []  
   {{(match 2 with 
   | 0 => true 
   | S k => false
@@ -619,7 +641,7 @@ Elpi Tactic essai.
 Elpi Accumulate lp:{{
 
 solve (goal _ _ _ _ [int p, term M, trm E, trm C] as G) GL :-   
-  essai F [] M E (app [C, holes_p p]) P, coq.ltac.call "myassert" [trm P] G GL. 
+  fun_to_prod F [] M E (app [C, holes_p p]) P, coq.ltac.call "myassert" [trm P] G GL. 
 }}.
 Elpi Typecheck.
 
@@ -719,12 +741,12 @@ end))  in blublut kik.
 
 Elpi Tactic mytac.
 Elpi Accumulate lp:{{
-  pred essai i : term, i : list term, i : term, i : term, i : term, o : term.
-     essai (fun X Ty F) L M E C  (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", 
-          essai (F x) [x | L ] M E C  (Re x).
-      essai F L M E C (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ) :- 
+  pred fun_to_prod i : term, i : list term, i : term, i : term, i : term, o : term.
+     fun_to_prod (fun X Ty F) L M E C  (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", 
+          fun_to_prod (F x) [x | L ] M E C  (Re x).
+      fun_to_prod F L M E C (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ) :- 
       coq.say "branche 2".
-    %essai F L M E C F . 
+    %fun_to_prod F L M E C F . 
 
 
   solve (goal _ _ _ _ [trm M] as G) GL :- coq.say M,
@@ -736,14 +758,7 @@ Elpi Accumulate lp:{{
   std.nth 1 LCases F, 
   coq.mk-n-holes P H, %coq.say H,
   coq.say "Ty is" Ty "\n\nF is " F  "\n\nM is" M  "\n\nE is" E "\n\nC is" C,
-  %essai (fun _ X0 c0\ fun _ (X1 c0) c1\ {{ true}}) []  
-  %{{(match 2%nat with 
-  %| 0 => true 
-  %| S k => false
-  %end) }} 
-  %{{2%nat}} {{S}} Pouet, coq.say Pouet, coq.ltac.call "myassert" [trm {{True}}] G GL.   
-  % essai F [] M E  C Re, coq.say Re, 
- essai F [] M E (app [C | H]) Re,% coq.say Pouet.
+  fun_to_prod F [] M E (app [C | H]) Re,% coq.say Pouet.
   coq.ltac.call "myassert" [trm Re] G GL. 
 }}.
 Elpi Typecheck.
@@ -753,12 +768,12 @@ Elpi Typecheck.
 
 Elpi Tactic mytac.
 Elpi Accumulate lp:{{
-  pred essai i : term, i : list term, i : term, i : term, i : term, o : term.
-     essai (fun X Ty F) L M E C  (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", coq.say " M is" M,
-          essai (F x) [x | L ] M E C  (Re x).
-      essai F L M E C (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ) :- 
+  pred fun_to_prod i : term, i : list term, i : term, i : term, i : term, o : term.
+     fun_to_prod (fun X Ty F) L M E C  (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", coq.say " M is" M,
+          fun_to_prod (F x) [x | L ] M E C  (Re x).
+      fun_to_prod F L M E C (prod _ (app [{{ @eq }}, _ , E , app [C | L] ]) (c\ app [{{@eq}}, _ , M , F ]) ) :- 
       coq.say "for essai, M is" M, coq.say "branche 2".
-    %essai F L M E C F . 
+    %fun_to_prod F L M E C F . 
 
 
   solve (goal _ _ _ _ [trm M, int N] as G) GL :- coq.say M,
@@ -772,7 +787,7 @@ Elpi Accumulate lp:{{
   std.nth N LCases F, coq.say "kikoo",
   coq.mk-n-holes P H, 
   coq.say "Ty is" Ty "\n\nF is " F  "\n\nM is" M  "\n\nE is" E "\n\nC is" C,
-  essai F [] M E (app [C | H]) Re, coq.say "Re est" Re,
+  fun_to_prod F [] M E (app [C | H]) Re, coq.say "Re est" Re,
   coq.ltac.call "myassert" [trm Re] G GL. 
 }}.
 Elpi Typecheck.
@@ -787,12 +802,12 @@ Elpi Query lp:{{
  % pi x \decl x _ Ty => whd1 (F x) T. %coq.say T.
   % whd1 {{ (fun (a b : nat) => a ) (2+ 3)}} T, 
   %coq.mk-n-holes 2 L, 
-  essai {{fun (a : nat) => true }}  [] {{false }} {{0}} {{S}} P, coq.say P.
- % essai {{fun (a : nat) ( b : bool)=> a }} [] {{true}} {{0}} {{S}} P.
+  fun_to_prod {{fun (a : nat) => true }}  [] {{false }} {{0}} {{S}} P, coq.say P.
+ % fun_to_prod {{fun (a : nat) ( b : bool)=> a }} [] {{true}} {{0}} {{S}} P.
 }}. *)
 
 Elpi Query lp:{{
-  essai (fun _ X0 c0\ fun _ (X1 c0) c1\ {{ true}}) []  
+  fun_to_prod (fun _ X0 c0\ fun _ (X1 c0) c1\ {{ true}}) []  
   {{(match 2 with 
   | 0 => true 
   | S k => false
