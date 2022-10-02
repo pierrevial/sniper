@@ -429,6 +429,11 @@ Elpi Typecheck.
 
 
 
+Goal False.
+elpi antiq. 
+Abort.
+
+
 Elpi Tactic printos.
 Elpi Accumulate lp:{{
   pred scos i : term, i : list term, i : term, i : term, i : term, o : term.
@@ -460,7 +465,7 @@ Elpi Typecheck.
 
 Tactic Notation "printos" constr(l) integer(n) := elpi printos ltac_term:(l) ltac_int:(n).
 
-Elpi Tactic mytac.
+Elpi Tactic pm_in_goal.
 Elpi Accumulate lp:{{
 
   
@@ -490,7 +495,6 @@ Elpi Accumulate lp:{{
   % P is the number of (type) parameters of Ty %%% \Q is P useful?
   % Ls is the list of the constructors of Ty (elpi type [constructor]) 
   % H is a list of P holes
-
   pred readmatch i : term, o : term, o : term, o : list term, o : int, o : list constructor, o : list term.
     readmatch M E Ty LCa P Ks H  :-
     M  = (match E _ LCa),
@@ -499,23 +503,30 @@ Elpi Accumulate lp:{{
     coq.env.indt I _ _ P _ Ks  _,
     coq.mk-n-holes P H.
 
-% SA should be unseald
-  pred assblut i : term, i : term, i : list term, i : list constructor, i : list term, i : goal, o : list sealed-goal.
-    assblut  M E H [] [] G [seal G] :- coq.say "fin assblut". % should we just have _ instead of [seal G]?
-    assblut  M E H [K | TK] [F | TLCa ] G GL :-  % GL remplaçable par [seal G] ? 
-      app [global (indc K) | H] = C, coq.say "assblut 2", fun_to_prod [] M E C F Pro, 
+% SA should be unsealed
+% pm_in_goal_case M E H [K1 , ... , Kn ] [F1 , ... , Fn ] G GL succesively asserts
+% and proves Pro_1, ..., Pro_n where fun_to_prod [] L M E (app [C_i | H]) Pro_i
+% and C_i is the 'term' associated to the 'constructor' K_i
+% Notes: 
+% * H is supposed to be a list of p holes representing the p parameters of 
+% the inductive datatype of M
+% * the proof of each Pro_i is obtained with a call to the tactic 'intro_inv'
+  pred pm_in_goal_case i : term, i : term, i : list term, i : list constructor, i : list term, i : goal, o : list sealed-goal.
+    pm_in_goal_case  M E H [] [] G [seal G] :- coq.say "fin assblut". % should we just have _ instead of [seal G]?
+    pm_in_goal_case  M E H [K | TK] [F | TLCa ] G GL :-  % GL remplaçable par [seal G] ? 
+      app [global (indc K) | H] = C, coq.say "pm_in_goal_case 2", fun_to_prod [] M E C F Pro, 
       coq.say "apres essai, Pro is" Pro,
       coq.typecheck Pro _ ok, % crucial when one wants to discard evars in Pro
-      coq.say "assblut 3",
+      coq.say "pm_in_goal_case 3",
       coq.ltac.call "myassert" [trm Pro] G [seal GPro    | LSG ], %seal G],
       coq.say "apres myassert",    
       coq.ltac.call "intro_inv" [] GPro [], 
       coq.say "avant l'appel rec de assblut",
-      assblut M E H TK TLCa G GL. % is it GL here?
+      pm_in_goal_case M E H TK TLCa G [seal G0]. % is it GL here? probably, since the context changes: still one goal though
   
   solve (goal _ _ _ _ [trm M] as G) GL :- 
     coq.say "solve 1", readmatch M E Ty LCa P Ks H, coq.say "solve 2", 
-    assblut M E H Ks LCa G GL.
+    pm_in_goal_case M E H Ks LCa G GL.
 
 
 %%%% loop supposée
@@ -531,17 +542,10 @@ Elpi Accumulate lp:{{
 Elpi Typecheck.
 
 
-
-Goal False.
-elpi antiq. 
-Abort.
-
 Goal nat.
 Elpi Query lp:{{ coq.say "KIKOOOOO". }}.
 
-
-
-  elpi mytac  (match 2 with 
+  elpi pm_in_goal  (match 2 with 
   | 0 => true 
   | S k => false
   end).
@@ -598,24 +602,24 @@ Elpi Query lp:{{
 Elpi Query lp:{{
  coq.say "KIKOOOOOOOOOOOOO".}}.
 
-Tactic Notation "mytac" constr(l) integer(n) := elpi mytac ltac_term:(l) ltac_int:(n).
+Tactic Notation "pm_in_goal" constr(l) integer(n) := elpi pm_in_goal ltac_term:(l) ltac_int:(n).
 
 
 
 Goal forall (n : nat), n = 3 -> 2 +2 = 5.
 intros n.
-mytac
+pm_in_goal 
      (match 2 with 
   | 0 => true 
   | S k => false
   end) 1. intros. reflexivity. clear H. 
-mytac
+pm_in_goal 
      (match (n + 2) with 
   | 0 => true 
   | S k => false
   end) 0.
 Fail idtac  "KIKOOOOOOOOOOOOO" ; sarace.
-  mytac (match [1 ; 2] with
+  pm_in_goal (match [1 ; 2] with
    | [] => false
    | _ :: _ => true
    end
@@ -739,7 +743,7 @@ end))  in blublut kik.
 
 
 
-Elpi Tactic mytac.
+Elpi Tactic pm_in_goal.
 Elpi Accumulate lp:{{
   pred fun_to_prod i : term, i : list term, i : term, i : term, i : term, o : term.
      fun_to_prod (fun X Ty F) L M E C  (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", 
@@ -756,9 +760,9 @@ Elpi Accumulate lp:{{
   std.map Ks (x\ y\ y = global (indc x)) LCtors, %coq.say LCtors,  % PB: if this line is commented, an error appear about LCases
   std.nth 1 LCtors C, % !!!!!!! test pour le ctor de rang 1 %%% Elpi does say anything if one just write nth instead of std.nth
   std.nth 1 LCases F, 
-  coq.mk-n-holes P H, %coq.say H,
+  coq.mk-n-holes P H,
   coq.say "Ty is" Ty "\n\nF is " F  "\n\nM is" M  "\n\nE is" E "\n\nC is" C,
-  fun_to_prod F [] M E (app [C | H]) Re,% coq.say Pouet.
+  fun_to_prod F [] M E (app [C | H]) Re,
   coq.ltac.call "myassert" [trm Re] G GL. 
 }}.
 Elpi Typecheck.
@@ -766,7 +770,7 @@ Elpi Typecheck.
 
 
 
-Elpi Tactic mytac.
+Elpi Tactic pm_in_goal.
 Elpi Accumulate lp:{{
   pred fun_to_prod i : term, i : list term, i : term, i : term, i : term, o : term.
      fun_to_prod (fun X Ty F) L M E C  (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1", coq.say " M is" M,
@@ -818,23 +822,23 @@ Elpi Query lp:{{
 Elpi Query lp:{{
  coq.say "KIKOOOOOOOOOOOOO".}}.
 
-Tactic Notation "mytac" constr(l) integer(n) := elpi mytac ltac_term:(l) ltac_int:(n).
+Tactic Notation "pm_in_goal" constr(l) integer(n) := elpi pm_in_goal ltac_term:(l) ltac_int:(n).
 
 
 
 Goal forall (n : nat), n = 3 -> 2 +2 = 5.
 intros n.
-mytac
+pm_in_goal 
      (match 2 with 
   | 0 => true 
   | S k => false
   end) 1. intros. reflexivity. clear H. 
-mytac
+pm_in_goal 
      (match (n + 2) with 
   | 0 => true 
   | S k => false
   end) 0.
-  mytac (match [1 ; 2] with
+  pm_in_goal (match [1 ; 2] with
    | [] => false
    | _ :: _ => true
    end
