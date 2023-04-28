@@ -178,7 +178,7 @@ Lemma foo: 2 = 2 /\ True.
 Proof.
 split.
 dumref. (* marche, donc on ne binde que la liste des subgoals créés par la tactique *)
-trivial.
+dumref. (* trivial. *)
 Qed.
 Reset foo.
 
@@ -469,13 +469,12 @@ Elpi Tactic pm_in_goal.
 Elpi Accumulate lp:{{
 
   
-    
-
   % fun_to_prod L M E C (fun (x1 : A1) ... (xn : An ) => f)
   %    outputs 
   % forall  (x1 : A1) ... (xn : An ), E = C [x1 ; ... ; xn L] -> M = f
   % where the x1 ... xn may occur in the expression f
-  % In practice, when fun_to_prod is called, M is a match on the expression E and C is a constructor of the type of E and L = [] (L is an accumulator)     
+  % In practice, when fun_to_prod is called, M is a match on the expression E and C is a constructor of the type of E and L = [] (L is an accumulator)  
+  % For instance,   
   pred fun_to_prod i : list term, i : term, i : term, i : term, i : term, o : term.
      fun_to_prod L M E C (fun X Ty F) (prod X Ty Re) :- !, coq.say "fun", pi x\ decl x _ Ty => coq.say "branche 1 essai", 
           fun_to_prod [x | L ] M E C (F x) (Re x).
@@ -521,8 +520,8 @@ Elpi Accumulate lp:{{
       coq.ltac.call "myassert" [trm Pro] G [seal GPro    | LSG ], %seal G],
       coq.say "apres myassert",    
       coq.ltac.call "intro_inv" [] GPro [], 
-      coq.say "avant l'appel rec de assblut",
-      pm_in_goal_case M E H TK TLCa G [seal G0]. % is it GL here? probably, since the context changes: still one goal though
+      coq.say "avant l'appel rec de assblut".
+      % pm_in_goal_case M E H TK TLCa G [seal G0]. % is it GL here? probably, since the context changes: still one goal though
   
   solve (goal _ _ _ _ [trm M] as G) GL :- 
     coq.say "solve 1", readmatch M E Ty LCa P Ks H, coq.say "solve 2", 
@@ -543,8 +542,7 @@ Elpi Typecheck.
 
 
 Goal nat.
-Elpi Query lp:{{ coq.say "KIKOOOOO". }}.
-
+Elpi Query lp:{{ coq.say "THE TEST". }}.
   elpi pm_in_goal  (match 2 with 
   | 0 => true 
   | S k => false
@@ -561,7 +559,7 @@ Abort.
 
 Elpi Query lp:{{ coq.say "KIKOOOOO". }}.
 
-Elpi Query lp:{{global (indt I)  = {{ nat }} , 
+(* Elpi Query lp:{{global (indt I)  = {{ nat }} , 
 coq.mk-n-holes 1 H,
 coq.env.indt I _ _ P _ Ks _  ,
   blutoz % {{L M E Ty P Ks H. }} .
@@ -571,7 +569,61 @@ coq.env.indt I _ _ P _ Ks _  ,
   | S k => false
   end) }} {{2}}  {{nat}}
    0 Ks H.
+}}. *)
+
+
+Elpi Tactic match_to_eqn.
+Elpi Accumulate lp:{{
+
+pred mkeqbo i:term, i:term, i:term, i:term, o:term.
+% mkeqbo: probably "make equality for body"
+mkeqbo {{ fun x => lp:(Bo x) }} K E M {{ fun x => lp:(Bo1 x) }} :- !,
+  @pi-decl `x` _ x\
+    mkeqbo (Bo x) {coq.mk-app K [x]} E M (Bo1 x).
+mkeqbo B K E (match _ RTy Bs as M) {{ fun h : lp:E = lp:K => lp:Proof h : lp:Ty }} :-
+  % lines below, E. directly builds a proof term
+  Proof = {{ @eq_ind_r _ lp:K lp:Pred (refl_equal lp:B) lp:E }},
+  % above, E tries to invert ....
+  Pred = {{ fun x => lp:{{ match {{ x }} RTy Bs }} = lp:B }},
+  % line above: Pref is probably the match where the matched expression is replaced with a bound variable
+  % e.g. [match M with branches] is replaced with [fun x=> match x with branches = B] (???) 
+  Ty = {{ lp:M = lp:B }}.
+
+% mkeqn [B1, ... , Bn] [K1, ..., Kn] E LetIn
+% where E is the matched expression, M is the match which matches E
+% and outputs the following "LetIn"
+% 
+pred mkeqn i:list term, i:list term, i:term, i:term, o:term.
+mkeqn [] [] _ _ {{ _ }}.
+mkeqn [B|Bs] [K|Ks] E M {{ let h := lp:Bo in lp:(R h) }} :-
+  mkeqbo B K E M Bo,
+  @pi-def `h` _ Bo h\
+    mkeqn Bs Ks E M (R h).
+
+solve (goal _ _ _ _ [trm (match E _ Bs as M)] as G) GL :- std.do! [
+  std.assert-ok! (coq.typecheck M _) "illtyped input",
+  coq.typecheck E Ty ok,
+  coq.safe-dest-app Ty (global (indt I)) Args,
+  coq.env.indt I _ _ Pno _ Ks _,
+  std.take Pno Args Params,
+  std.map Ks (x\r\ coq.mk-app (global (indc x)) Params r) KPs,
+  % line above: takes the lists of constructors Ks = [C1, ..., Cn] and outputs [app C1::Params, ... Cn::Params] 
+  mkeqn Bs KPs E M T,
+  %BUG: coq.say "M=" M "T=" {coq.term->string T},
+  std.assert! (refine T G GL) "bug in term generation",
+].
 }}.
+Elpi Typecheck.
+
+
+Lemma foo : nat.
+
+elpi match_to_eqn (match 2 with
+| 0 => true
+| S k => false
+end).
+
+
 
 (* pred blutoz i : list term, i : term, i: term, i: inductive, i: int, i :term, i : list constructor, i : list term.
   blutoz LCases M E Ty I P Ks H  *)
